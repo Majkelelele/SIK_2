@@ -67,12 +67,10 @@ int main(int argc, char *argv[]) {
     }
     std:: cout << '\n';
 
-    // for(int i = 1; i < 14; i++) {
-    // sleep(3);
-    std::string card_list = read_trick(socket_fd);
-    std::cout << "CArd List: " << card_list << '\n';
-    send_trick(socket_fd,sortedCards[0],1);
-    // }
+    for(int i = 1; i <= ROUNDS; i++) {
+        read_trick(socket_fd, "CLIENT" ,i);
+        send_trick(socket_fd,sortedCards[i-1],i);
+    }
     
 
 

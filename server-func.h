@@ -21,6 +21,7 @@ extern std::vector<Deal> deals;
 extern bool finish;
 extern std::string current_cards_list;
 extern int current_deal;
+extern int players_played_in_round;
 
 
 /* Print usage information. */

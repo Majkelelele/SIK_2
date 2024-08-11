@@ -38,6 +38,7 @@ std::vector<Deal> deals;
 bool finish = false;
 std::string current_cards_list = "";
 int current_deal;
+int players_played_in_round;
 
 std::map<std::string, int> position_id_map;
 
@@ -47,6 +48,8 @@ void initilizeMap() {
   position_id_map["S"] = -1;
   position_id_map["W"] = -1;
 }
+
+
 
 // Funkcja do rozdzielenia linii na poszczególne karty
 std::vector<std::string> splitCards(const std::string &line) {
@@ -293,6 +296,7 @@ void assign_position_to_index(std::string pos, int id) {
   }
 }
 
+
 int accept_client(int client_id, struct sockaddr_in *client_address,
                   socklen_t *client_address_len) {
 
@@ -319,6 +323,25 @@ int accept_client(int client_id, struct sockaddr_in *client_address,
   return client_fd;
 }
 
+std::string find_who_won() {
+  if (cards_in_round.empty()) {
+      return "No cards in round"; 
+  }
+
+  const Card& leadingCard = cards_in_round.front(); 
+  std::string leadingColor = leadingCard.getColor(); 
+
+  const Card* winningCard = &leadingCard;
+
+  for (const Card& card : cards_in_round) {
+      if (card.getColor() == leadingColor && card.greaterEq(*winningCard)) {
+          winningCard = &card;
+      }
+  }
+
+  return winningCard->getGracz();
+};
+
 void trick_communication(int client_id, std::string position, int client_fd) {
   if (client_id == CLIENTS - 1) {
     if (pthread_mutex_unlock(
@@ -326,33 +349,48 @@ void trick_communication(int client_id, std::string position, int client_fd) {
       syserr("Error unlocking mutex %d\n");
     }
   }
-  // for (int i = 0; i < CLIENTS; i++) {
+  for (int i = 1; i <= ROUNDS; i++) {
 
   
-  std::cout << "before my mutex\n";
-  if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
-    syserr("Error locking mutex %d\n");
-  }
-  std::cout << "before global mutex\n";
-  if (pthread_mutex_lock(&global_mutex) != 0) {
-    syserr("Error locking mutex %d\n");
-  }
+    if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
+      syserr("Error locking mutex %d\n");
+    }
+    if (pthread_mutex_lock(&global_mutex) != 0) {
+      syserr("Error locking mutex %d\n");
+    }
 
-  send_trick(client_fd, current_cards_list, 1);
-  current_cards_list += read_trick(client_fd);
-  std::string next_position = find_who_next(position);
-  int next_to_play = position_id_map.at(next_position);
+    send_trick(client_fd, current_cards_list, i);
+    current_cards_list += read_trick(client_fd, position,i);
+    std::string next_position = find_who_next(position);
+    
+    players_played_in_round++;
+    
+    if(players_played_in_round == 4){
+      // countpoints
+      std::cout << "position of 4th player" + position + '\n'; 
+      std::cout << "CARDS LIST after round: " + current_cards_list + '\n';
+      std::cout << "card in round: \n";
+      for(int i = 0; i < cards_in_round.size(); i++) {
+        cards_in_round[i].printCard();
+      }
+      next_position = find_who_won();
+      players_played_in_round = 0;
+      cards_in_round.clear();
+      current_cards_list = "";
+    }
+
+    int next_to_play = position_id_map.at(next_position);
 
 
-  if (pthread_mutex_unlock(&global_mutex) != 0) {
-    syserr("Error unlocking mutex %d\n");
-  }
-  if (pthread_mutex_unlock(&mutexes[next_to_play]) != 0) {
-    syserr("Error unlocking mutex %d\n");
+    if (pthread_mutex_unlock(&global_mutex) != 0) {
+      syserr("Error unlocking mutex %d\n");
+    }
+    if (pthread_mutex_unlock(&mutexes[next_to_play]) != 0) {
+      syserr("Error unlocking mutex %d\n");
   }
   
 
-  // }
+  }
 }
 
 void *handle_connection(void *client_id_ptr) {
@@ -367,8 +405,7 @@ void *handle_connection(void *client_id_ptr) {
 
   std::string position = process_IAM_message(client_fd);
 
-  if (position == "")
-    syserr("error reading IAM");
+  if (position == "") syserr("error reading IAM");
   assign_position_to_index(position, client_id);
 
   // after IAM
@@ -381,7 +418,6 @@ void *handle_connection(void *client_id_ptr) {
                       deal.cards.at(position));
 
   pthread_barrier_wait(&clients_barrier);
-  std::cout << "after deal barrier\n";
   trick_communication(client_id, position, client_fd);
 
   pthread_barrier_wait(&final_barrier);
@@ -392,6 +428,7 @@ void *handle_connection(void *client_id_ptr) {
 int prepare_shared_variables(int socket_fd) {
   current_deal = 0;
   pthread_t threads[CLIENTS];
+  players_played_in_round = 0;
 
   if (pthread_barrier_init(&final_barrier, NULL, CLIENTS + 1) != 0)
     syserr("final barrier initialization failed");
