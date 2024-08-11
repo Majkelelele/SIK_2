@@ -21,6 +21,10 @@
 #include <arpa/inet.h>
 #include "err.h"
 #include "common.h"
+#include <iomanip>
+#include <chrono>
+#include <ctime>
+#include <sstream>
 
 
 void printUsage() {
@@ -74,7 +78,7 @@ void send_IAM(int socket_fd, char place) {
 }
 
 std::vector<std::string> read_deal(int socket_fd) {
-    static char buffer[BUFFER_SIZE];
+    char buffer[BUFFER_SIZE];
     ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
     std::string card_list;
     if (received_bytes < 0) {
@@ -107,4 +111,34 @@ std::vector<std::string> read_deal(int socket_fd) {
     }
     std::vector<std::string> sortedCards = parseAndSortCards(card_list);
     return sortedCards;
+}
+
+void read_score(int socket_fd) {
+    char buffer[BUFFER_SIZE];
+    ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
+
+    if (received_bytes <= 0) {
+        error("error when reading message from connection");
+        close(socket_fd);
+    } else {
+        buffer[received_bytes] = '\0';  // Dodaj znak końca ciągu
+
+        // Zakładamy, że otrzymany komunikat jest poprawny i zaczyna się od "SCORE"
+        std::string message(buffer);
+
+        // Pobranie czasu bieżącego
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+        // Formatowanie czasu jako YYYY-MM-DDTHH:MM:SS.sss
+        std::stringstream timestamp;
+        timestamp << std::put_time(std::localtime(&now_time), "%Y-%m-%dT%H:%M:%S");
+        timestamp << '.' << std::setw(3) << std::setfill('0') << now_ms.count();
+
+        std::string output_message = "[11.22.33.44:1234,44.44.44.44:4321," + timestamp.str() + "] " + message + "\r\n";
+
+        // Wypisanie wiadomości w zadanym formacie
+        write(STDOUT_FILENO, output_message.c_str(), output_message.size());
+    }
 }

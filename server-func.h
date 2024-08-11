@@ -33,44 +33,6 @@ void parseArguments(int argc, char* argv[], int* port, std::string* file, int* t
 
 
 
-// Klasa reprezentująca rozdanie typu "nie brać lew"
-class NoTricksDeal : public DealType {
-public:
-    NoTricksDeal() { id = "1"; } // Konstruktor ustawiający id
-    virtual int countPoints(const std::vector<std::string>& cardsN, const std::vector<std::string>& cardsE,
-                            const std::vector<std::string>& cardsS, const std::vector<std::string>& cardsW) const override {
-        return cardsN.size() + cardsE.size() + cardsS.size() + cardsW.size();
-    }
-};
-
-// Klasa reprezentująca rozdanie typu "nie brać kierów"
-class NoHeartsDeal : public DealType {
-public:
-    virtual int countPoints(const std::vector<std::string>& cardsN, const std::vector<std::string>& cardsE, 
-                            const std::vector<std::string>& cardsS, const std::vector<std::string>& cardsW) const override {
-        int points = 0;
-        points += countSuitPoints(cardsN, 'H');
-        points += countSuitPoints(cardsE, 'H');
-        points += countSuitPoints(cardsS, 'H');
-        points += countSuitPoints(cardsW, 'H');
-        return points;
-    }
-    NoHeartsDeal() { id = "2"; } // Konstruktor ustawiający id
-
-private:
-    int countSuitPoints(const std::vector<std::string>& cards, char suit) const {
-        int points = 0;
-        for (const auto& card : cards) {
-            if (card[1] == suit) // Sprawdź, czy karta należy do kierów
-                points++;
-        }
-        return points;
-    }
-};
-
-
-
-
 
 std::vector<std::string> splitCards(const std::string& line);
 void parseDealsFromFile(const std::string& filename);
@@ -87,5 +49,8 @@ void destroy_and_finish();
 int accept_client(int client_id, struct sockaddr_in *client_address, socklen_t *client_address_len);
 std::string process_IAM_message(int client_fd);
 void trick_communication(int client_id, std::string position, int client_fd);
+void send_score_to_client(int client_fd);
+
+
 
 #endif

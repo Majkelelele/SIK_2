@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <vector>
 
+
 #define TIMEOUT -1
 
 pthread_mutex_t global_mutex;
@@ -41,15 +42,18 @@ int current_deal;
 int players_played_in_round;
 
 std::map<std::string, int> position_id_map;
+std::map<std::string, int> total_points_map;
 
-void initilizeMap() {
+void initilizeMaps() {
   position_id_map["N"] = -1;
   position_id_map["E"] = -1;
   position_id_map["S"] = -1;
   position_id_map["W"] = -1;
+  total_points_map["N"] = 0;
+  total_points_map["E"] = 0;
+  total_points_map["S"] = 0;
+  total_points_map["W"] = 0;
 }
-
-
 
 // Funkcja do rozdzielenia linii na poszczególne karty
 std::vector<std::string> splitCards(const std::string &line) {
@@ -79,11 +83,29 @@ void parseDealsFromFile(const std::string &filename) {
     // Ustawienie odpowiedniego typu rozdania
     switch (deal_type) {
     case 1:
-      deal.dealType = new NoTricksDeal();
+      deal.dealType = new NoTricks();
       break;
     case 2:
-      deal.dealType = new NoHeartsDeal();
+      deal.dealType = new NoHearts();
       break;
+    case 3:
+      deal.dealType = new NoQueens();
+      break;
+    case 4:
+      deal.dealType = new NoJacksKings();
+      break;
+    case 5:
+      deal.dealType = new NoKingOfHearts();
+      break;
+    case 6:
+      deal.dealType = new NoSeventhAndLastTrick();
+      break;
+    case 7:
+      deal.dealType = new Rogue();
+      break;
+    default:
+      std::cerr << "Nieznany typ rozdania: " << deal_type << std::endl;
+      continue;
     }
 
     std::getline(file, line);
@@ -296,10 +318,8 @@ void assign_position_to_index(std::string pos, int id) {
   }
 }
 
-
 int accept_client(int client_id, struct sockaddr_in *client_address,
                   socklen_t *client_address_len) {
-
 
   if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
     syserr("Error locking mutex %d\n");
@@ -325,22 +345,31 @@ int accept_client(int client_id, struct sockaddr_in *client_address,
 
 std::string find_who_won() {
   if (cards_in_round.empty()) {
-      return "No cards in round"; 
+    return "No cards in round";
   }
 
-  const Card& leadingCard = cards_in_round.front(); 
-  std::string leadingColor = leadingCard.getColor(); 
+  const Card &leadingCard = cards_in_round.front();
+  std::string leadingColor = leadingCard.getColor();
 
-  const Card* winningCard = &leadingCard;
+  const Card *winningCard = &leadingCard;
 
-  for (const Card& card : cards_in_round) {
-      if (card.getColor() == leadingColor && card.greaterEq(*winningCard)) {
-          winningCard = &card;
-      }
+  for (const Card &card : cards_in_round) {
+    if (card.getColor() == leadingColor && card.greaterEq(*winningCard)) {
+      winningCard = &card;
+    }
   }
 
   return winningCard->getGracz();
 };
+
+std::string summarize_trick() {
+
+  int points_to_add = deals[0].dealType->countPoints(cards_in_round);
+  std::string who_won = find_who_won();
+  std:: cout << "Player" + who_won + "lost" + std::to_string(points_to_add) + "points" + '\n';
+  total_points_map.at(who_won) += points_to_add;
+  return who_won;
+}
 
 void trick_communication(int client_id, std::string position, int client_fd) {
   if (client_id == CLIENTS - 1) {
@@ -351,7 +380,6 @@ void trick_communication(int client_id, std::string position, int client_fd) {
   }
   for (int i = 1; i <= ROUNDS; i++) {
 
-  
     if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
       syserr("Error locking mutex %d\n");
     }
@@ -360,20 +388,20 @@ void trick_communication(int client_id, std::string position, int client_fd) {
     }
 
     send_trick(client_fd, current_cards_list, i);
-    current_cards_list += read_trick(client_fd, position,i);
+    current_cards_list += read_trick(client_fd, position, i);
     std::string next_position = find_who_next(position);
-    
+
     players_played_in_round++;
-    
-    if(players_played_in_round == 4){
+
+    if (players_played_in_round == 4) {
       // countpoints
-      std::cout << "position of 4th player" + position + '\n'; 
+      std::cout << "position of 4th player" + position + '\n';
       std::cout << "CARDS LIST after round: " + current_cards_list + '\n';
       std::cout << "card in round: \n";
-      for(int i = 0; i < cards_in_round.size(); i++) {
+      for (size_t i = 0; i < cards_in_round.size(); i++) {
         cards_in_round[i].printCard();
       }
-      next_position = find_who_won();
+      next_position = summarize_trick();
       players_played_in_round = 0;
       cards_in_round.clear();
       current_cards_list = "";
@@ -381,17 +409,42 @@ void trick_communication(int client_id, std::string position, int client_fd) {
 
     int next_to_play = position_id_map.at(next_position);
 
-
     if (pthread_mutex_unlock(&global_mutex) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
     if (pthread_mutex_unlock(&mutexes[next_to_play]) != 0) {
       syserr("Error unlocking mutex %d\n");
-  }
-  
-
+    }
   }
 }
+
+void send_score_to_client(int client_fd) {
+    char line[BUFFER_SIZE];
+    memset(line, 0, BUFFER_SIZE);
+
+    // Tworzenie wiadomości SCORE
+    std::string score_message = "SCORE";
+    for (const auto& pair : total_points_map) {
+      const std::string& position = pair.first;
+      int score = pair.second;
+      score_message += position + std::to_string(score);
+    }
+    score_message += "\r\n";
+
+    // Przekopiowanie wiadomości do bufora
+    snprintf(line, BUFFER_SIZE, "%s", score_message.c_str());
+
+    // Wysyłanie wiadomości
+    std::cout << "sending: " << line;
+    size_t data_to_send = strnlen(line, BUFFER_SIZE);
+    ssize_t written_length = writen(client_fd, line, data_to_send);
+    if (written_length < 0) {
+        syserr("writen");
+    } else if ((size_t)written_length != data_to_send) {
+        fatal("incomplete writen");
+    }
+}
+
 
 void *handle_connection(void *client_id_ptr) {
   struct sockaddr_in client_address;
@@ -405,7 +458,8 @@ void *handle_connection(void *client_id_ptr) {
 
   std::string position = process_IAM_message(client_fd);
 
-  if (position == "") syserr("error reading IAM");
+  if (position == "")
+    syserr("error reading IAM");
   assign_position_to_index(position, client_id);
 
   // after IAM
@@ -413,14 +467,18 @@ void *handle_connection(void *client_id_ptr) {
 
   // DEAL
   Deal deal = deals[0];
-  std::string deal_type = deal.dealType->toString();
+  std::string deal_type = deal.dealType->id;
   send_deal_to_client(client_fd, deal_type, deal.startingClient,
                       deal.cards.at(position));
 
   pthread_barrier_wait(&clients_barrier);
   trick_communication(client_id, position, client_fd);
+  pthread_barrier_wait(&clients_barrier);
+  send_score_to_client(client_fd);
+  
 
   pthread_barrier_wait(&final_barrier);
+  std::cout << "total points received by " + position + " = " + std::to_string(total_points_map.at(position)) + "\n"; 
 
   return 0;
 }
@@ -458,7 +516,7 @@ int prepare_shared_variables(int socket_fd) {
   // Inicjalizacja głównego deskryptora
   main_descriptor = socket_fd;
 
-  initilizeMap();
+  initilizeMaps();
 
   // Tworzenie wątków
   for (int i = 0; i < CLIENTS; i++) {

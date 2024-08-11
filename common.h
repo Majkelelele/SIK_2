@@ -9,11 +9,13 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <algorithm>
 
 #define CONNECTIONS 5
 #define BUFFER_SIZE 100
 #define CLIENTS 4
 #define ROUNDS 13
+
 
 class Card {
 private:
@@ -69,10 +71,10 @@ int set_nonblocking(int fd);
 Card createCardFromString(const std::string& cardStr, const std::string& gracz);
 
 
+
 class DealType {
 public:
-    virtual int countPoints(const std::vector<std::string>& cardsN, const std::vector<std::string>& cardsE,
-                            const std::vector<std::string>& cardsS, const std::vector<std::string>& cardsW) const = 0;
+    virtual int countPoints(const std::vector<Card>& trick) const = 0;
     std::string id;
     virtual ~DealType() {} // Wirtualny destruktor
     std::string toString() const {
@@ -91,6 +93,92 @@ struct Deal {
         cards["E"] = std::vector<std::string>();
         cards["S"] = std::vector<std::string>();
         cards["W"] = std::vector<std::string>();
+    }
+};
+
+
+
+
+// Nie brać lew, 1 punkt za każdą wziętą lewę
+class NoTricks : public DealType {
+public:
+    NoTricks() { id = "1"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        return 1; // Za każdą wziętą lewę dostaje się 1 punkt
+    }
+};
+
+// Nie brać kierów, 1 punkt za każdego wziętego kiera w lewie
+class NoHearts : public DealType {
+public:
+    NoHearts() { id = "2"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        return std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getColor() == "H"; });
+    }
+};
+
+// Nie brać dam, 5 punktów za każdą damę w lewie
+class NoQueens : public DealType {
+public:
+    NoQueens() { id = "3"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        return std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getWartosc() == "Q"; }) * 5;
+    }
+};
+
+// Nie brać panów (waletów i króli), 2 punkty za każdego pana w lewie
+class NoJacksKings : public DealType {
+public:
+    NoJacksKings() { id = "4"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        return std::count_if(trick.begin(), trick.end(), [](const Card& c) {
+            return c.getWartosc() == "J" || c.getWartosc() == "K";
+        }) * 2;
+    }
+};
+
+// Nie brać króla kier, 18 punktów za jego wzięcie
+class NoKingOfHearts : public DealType {
+public:
+    NoKingOfHearts() { id = "5"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        return std::count_if(trick.begin(), trick.end(), [](const Card& c) {
+            return c.getWartosc() == "K" && c.getColor() == "H";
+        }) * 18;
+    }
+};
+
+// Nie brać siódmej i ostatniej lewy, 10 punktów za każdą z tych lew
+class NoSeventhAndLastTrick : public DealType {
+public:
+    NoSeventhAndLastTrick() { id = "6"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        return 10; // Wartość punktowa za siódmą lub ostatnią lewę
+    }
+};
+
+// Rozbójnik: Punkty za wszystko powyższe
+class Rogue : public DealType {
+public:
+    Rogue() { id = "7"; }
+
+    int countPoints(const std::vector<Card>& trick) const override {
+        int points = 0;
+        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getColor() == "H"; });
+        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getWartosc() == "Q"; }) * 5;
+        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) {
+            return c.getWartosc() == "J" || c.getWartosc() == "K";
+        }) * 2;
+        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) {
+            return c.getWartosc() == "K" && c.getColor() == "H";
+        }) * 18;
+        return points;
     }
 };
 

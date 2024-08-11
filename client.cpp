@@ -68,11 +68,11 @@ int main(int argc, char *argv[]) {
     std:: cout << '\n';
 
     for(int i = 1; i <= ROUNDS; i++) {
-        read_trick(socket_fd, "CLIENT" ,i);
+        read_trick(socket_fd, "CLIENT", i);
         send_trick(socket_fd,sortedCards[i-1],i);
     }
     
-
+    read_score(socket_fd);
 
     close(socket_fd);
 
