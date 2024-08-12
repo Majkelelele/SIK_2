@@ -51,19 +51,13 @@ int main(int argc, char *argv[]) {
     install_signal_handler(SIGINT, catch_int, SA_RESTART);
     parseArguments(argc, argv, &port, &file, &timeout);
 
-    // Output the parsed values
-    std::cout << "Server Configuration:\n";
-    std::cout << "Port: " << port << "\n";
-    std::cout << "File: " << file << "\n";
-    std::cout << "Timeout: " << timeout << " seconds\n";
-
     parseDealsFromFile(file);
     if (deals.empty()) {
         std::cerr << "Brak rozdań do wyświetlenia lub plik jest pusty.\n";
         return 1;
     }
 
-    printDeals(deals);
+    // printDeals(deals);
 
     
     
@@ -94,9 +88,6 @@ int main(int argc, char *argv[]) {
     if (getsockname(socket_fd, (struct sockaddr *) &server_address, &lenght) < 0) {
         syserr("getsockname");
     }
-
-    printf("listening on port %" PRIu16 "\n", ntohs(server_address.sin_port));
-
     
     
 

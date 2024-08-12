@@ -77,7 +77,8 @@ void send_IAM(int socket_fd, char place) {
     }
 }
 
-std::vector<std::string> read_deal(int socket_fd) {
+std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
+ uint16_t port_sender, char *ip_local, uint16_t port_local) {
     char buffer[BUFFER_SIZE];
     ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
     std::string card_list;
@@ -85,35 +86,31 @@ std::vector<std::string> read_deal(int socket_fd) {
         error("error when reading message from connection");
         close(socket_fd);
     } else if (received_bytes == 0) {
-        printf("ending connection\n");
+        syserr("ending connection\n");
         close(socket_fd);
     } else {
+        print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
+
         buffer[received_bytes] = '\0';  // Dodaj znak końca ciągu
         
         // Podział stringa na poszczególne części
         std::string message(buffer);
         std::string deal_type;
-        char starting_client;
         
 
         // Sprawdź, czy wiadomość rozpoczyna się od "DEAL"
         if (message.substr(0, 4) == "DEAL") {
             deal_type = message.substr(4, 1); // Typ rozdania to jednoliterowy string
-            starting_client = message[5]; // Miejsce przy stole klienta wychodzącego jako pierwszy to jeden znak
             card_list = message.substr(6, message.length() - 8); // Reszta to lista kart, -3 aby usunąć \r\n
-            std::cout << "cards count: " << sizeof(card_list) << std::endl; 
-            std::cout << "Deal Type: " << deal_type << std::endl;
-            std::cout << "Starting Client: " << starting_client << std::endl;
-            std::cout << "Card List: " << card_list << std::endl;
         } else {
-            std::cerr << "Invalid message format. Expected message to start with 'DEAL'." << std::endl;
+            syserr("Invalid message format. Expected message to start with 'DEAL'.");
         }
     }
     std::vector<std::string> sortedCards = parseAndSortCards(card_list);
     return sortedCards;
 }
 
-void read_score(int socket_fd) {
+void read_score(int socket_fd, char *ip_sender, uint16_t port_sender, char *ip_local, uint16_t port_local) {
     char buffer[BUFFER_SIZE];
     ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
 
@@ -121,24 +118,8 @@ void read_score(int socket_fd) {
         error("error when reading message from connection");
         close(socket_fd);
     } else {
-        buffer[received_bytes] = '\0';  // Dodaj znak końca ciągu
+        
 
-        // Zakładamy, że otrzymany komunikat jest poprawny i zaczyna się od "SCORE"
-        std::string message(buffer);
-
-        // Pobranie czasu bieżącego
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-
-        // Formatowanie czasu jako YYYY-MM-DDTHH:MM:SS.sss
-        std::stringstream timestamp;
-        timestamp << std::put_time(std::localtime(&now_time), "%Y-%m-%dT%H:%M:%S");
-        timestamp << '.' << std::setw(3) << std::setfill('0') << now_ms.count();
-
-        std::string output_message = "[11.22.33.44:1234,44.44.44.44:4321," + timestamp.str() + "] " + message + "\r\n";
-
-        // Wypisanie wiadomości w zadanym formacie
-        write(STDOUT_FILENO, output_message.c_str(), output_message.size());
+        print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
     }
 }

@@ -31,21 +31,12 @@ int main(int argc, char *argv[]) {
     }
 
     ClientParams params = parseArgumentsClient(argc, argv);
-
-    // Use parsed parameters
-    std::cout << "Host: " << params.host << std::endl;
-    std::cout << "Port: " << params.port << std::endl;
-    std::cout << "IPv4: " << (params.ipv4 ? "true" : "false") << std::endl;
-    std::cout << "IPv6: " << (params.ipv6 ? "true" : "false") << std::endl;
-    std::cout << "Place: " << params.place << std::endl;
-    std::cout << "Automatic: " << (params.automatic ? "true" : "false") << std::endl;
-
   
-    const char *host= params.host.c_str();
-    // const char *host = argv[1];
-    // uint16_t port = read_port(argv[2]);
-    struct sockaddr_in server_address = get_server_address(host, params.port);
+    
+    
+    struct sockaddr_in server_address = get_server_address(params.host.c_str(), params.port);
 
+    
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd < 0) {
         syserr("cannot create a socket");
@@ -56,25 +47,39 @@ int main(int argc, char *argv[]) {
         syserr("cannot connect to the server");
     }
 
-    printf("connected to %s:%" PRIu16 "\n", host, params.port);
+    char ip_server[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &server_address.sin_addr, ip_server, sizeof(ip_server));
+    uint16_t port_server = ntohs(server_address.sin_port);
 
+
+
+    struct sockaddr_in local_address;
+    socklen_t address_length = sizeof(local_address);
+
+    // Pobranie lokalnego adresu IP i portu
+    if (getsockname(socket_fd, (struct sockaddr *)&local_address, &address_length) == -1) {
+        perror("getsockname failed");
+        close(socket_fd);
+        return 1;
+    }
+
+    char ip_local[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &local_address.sin_addr, ip_local, sizeof(ip_local));
+
+    uint16_t local_port = ntohs(local_address.sin_port);
     
     send_IAM(socket_fd,params.place);
-    std::vector<std::string> sortedCards = read_deal(socket_fd);
-    std:: cout << "CARDS\n";
-    for (int i = 0; i < 13; i++) {
-        std::cout << sortedCards[i] << " ";
-    }
-    std:: cout << '\n';
+    std::vector<std::string> sortedCards = read_deal(socket_fd, ip_server, port_server, ip_local, local_port);
 
     for(int i = 1; i <= ROUNDS; i++) {
-        read_trick(socket_fd, "CLIENT", i);
+        read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
         send_trick(socket_fd,sortedCards[i-1],i);
     }
     
-    read_score(socket_fd);
+    read_score(socket_fd, ip_server, port_server, ip_local, local_port);
 
     close(socket_fd);
+    
 
     
     return 0;

@@ -47,9 +47,11 @@ void *handle_connection(void *client_fd_ptr);
 int prepare_shared_variables(int socket_fd);
 void destroy_and_finish();
 int accept_client(int client_id, struct sockaddr_in *client_address, socklen_t *client_address_len);
-std::string process_IAM_message(int client_fd);
-void trick_communication(int client_id, std::string position, int client_fd);
-void send_score_to_client(int client_fd);
+std::string process_IAM_message(int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
+void trick_communication(int client_id, std::string position, int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
+ void send_score_to_client(int client_fd);
 
 
 

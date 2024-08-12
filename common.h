@@ -58,17 +58,20 @@ public:
 extern std::vector<Card> cards_in_round;
 
 struct sockaddr_in get_server_address(char const *host, uint16_t port);
-ssize_t	readn(int fd, void *vptr, size_t n);
+ssize_t readn(int fd, char *buf, size_t buf_size);
 ssize_t	writen(int fd, const void *vptr, size_t n);
 void install_signal_handler(int signal, void (*handler)(int), int flags);
 uint16_t read_port(char const *string);
 int send_trick(int socket_fd, std::string card_list, int numer_lewy);
-std::string read_trick(int socket_fd, std::string position, int expected_trick_number);
+std::string read_trick(int socket_fd, std::string position, int expected_trick_number,
+ const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 bool compareCards(const std::string& card1, const std::string& card2,
- const std::unordered_map<char, int>& cardValueMap);
- std::vector<std::string> parseAndSortCards(const std::string& cardString);
+const std::unordered_map<char, int>& cardValueMap);
+std::vector<std::string> parseAndSortCards(const std::string& cardString);
 int set_nonblocking(int fd);
 Card createCardFromString(const std::string& cardStr, const std::string& gracz);
+void print_formatted_message(char *buffer, ssize_t received_bytes, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 
 
 
@@ -104,8 +107,8 @@ class NoTricks : public DealType {
 public:
     NoTricks() { id = "1"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
-        return 1; // Za każdą wziętą lewę dostaje się 1 punkt
+    int countPoints(const std::vector<Card>& /*trick*/) const override {
+        return 1; 
     }
 };
 
@@ -158,7 +161,7 @@ class NoSeventhAndLastTrick : public DealType {
 public:
     NoSeventhAndLastTrick() { id = "6"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
+    int countPoints(const std::vector<Card>& /*trick*/) const override {
         return 10; // Wartość punktowa za siódmą lub ostatnią lewę
     }
 };

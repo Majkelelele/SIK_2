@@ -226,8 +226,6 @@ void send_deal_to_client(int client_fd, const std::string &deal_type,
   snprintf(line, BUFFER_SIZE, "DEAL%s%s%s\r\n", deal_type.c_str(),
            starting_client.c_str(), card_list.c_str());
 
-  // Wysyłanie wiadomości
-  std::cout << "sending:" << line;
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
   ssize_t written_length = writen(client_fd, line, data_to_send);
   if (written_length < 0) {
@@ -248,7 +246,8 @@ std::string find_who_next(std::string current) {
     return "N";
 }
 
-std::string process_IAM_message(int client_fd) {
+std::string process_IAM_message(int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
   static std::map<int, std::string>
       client_buffers; // To store buffer per client
   char buffer[BUFFER_SIZE];
@@ -291,8 +290,8 @@ std::string process_IAM_message(int client_fd) {
         // Process the message
         std::string place = message.substr(
             prefix.size(), message.size() - prefix.size() - suffix.size());
-        std::cout << "Miejsce przy stole: " << place << std::endl;
 
+        print_formatted_message(buffer,received_bytes,ip_sender,port_sender,ip_local,port_local);
         // Return the place extracted from the message
         return place;
       } else {
@@ -325,16 +324,13 @@ int accept_client(int client_id, struct sockaddr_in *client_address,
     syserr("Error locking mutex %d\n");
   }
 
-  printf("[%lu] thread is starting\n", (unsigned long)pthread_self());
 
-  std::cout << "client id: " << client_id << '\n';
 
   int client_fd = accept(main_descriptor, (struct sockaddr *)client_address,
                          client_address_len);
   if (client_fd < 0)
     syserr("accept");
-  std::cout << "accepted client"
-            << "\n";
+
 
   if (client_id < CLIENTS - 1 &&
       pthread_mutex_unlock(&mutexes[(client_id + 1) % CLIENTS]) != 0) {
@@ -366,12 +362,13 @@ std::string summarize_trick() {
 
   int points_to_add = deals[0].dealType->countPoints(cards_in_round);
   std::string who_won = find_who_won();
-  std:: cout << "Player" + who_won + "lost" + std::to_string(points_to_add) + "points" + '\n';
+  std:: cout << "Player " + who_won + " lost " + std::to_string(points_to_add) + " points" + '\n';
   total_points_map.at(who_won) += points_to_add;
   return who_won;
 }
 
-void trick_communication(int client_id, std::string position, int client_fd) {
+void trick_communication(int client_id, std::string position, int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
   if (client_id == CLIENTS - 1) {
     if (pthread_mutex_unlock(
             &mutexes[position_id_map.at(deals[0].startingClient)]) != 0) {
@@ -388,19 +385,15 @@ void trick_communication(int client_id, std::string position, int client_fd) {
     }
 
     send_trick(client_fd, current_cards_list, i);
-    current_cards_list += read_trick(client_fd, position, i);
+    current_cards_list += read_trick(client_fd, position, i, ip_sender, port_sender, ip_local, port_local);
     std::string next_position = find_who_next(position);
 
     players_played_in_round++;
 
     if (players_played_in_round == 4) {
-      // countpoints
-      std::cout << "position of 4th player" + position + '\n';
-      std::cout << "CARDS LIST after round: " + current_cards_list + '\n';
-      std::cout << "card in round: \n";
-      for (size_t i = 0; i < cards_in_round.size(); i++) {
-        cards_in_round[i].printCard();
-      }
+      // for (size_t i = 0; i < cards_in_round.size(); i++) {
+      //   cards_in_round[i].printCard();
+      // }
       next_position = summarize_trick();
       players_played_in_round = 0;
       cards_in_round.clear();
@@ -435,7 +428,6 @@ void send_score_to_client(int client_fd) {
     snprintf(line, BUFFER_SIZE, "%s", score_message.c_str());
 
     // Wysyłanie wiadomości
-    std::cout << "sending: " << line;
     size_t data_to_send = strnlen(line, BUFFER_SIZE);
     ssize_t written_length = writen(client_fd, line, data_to_send);
     if (written_length < 0) {
@@ -455,8 +447,31 @@ void *handle_connection(void *client_id_ptr) {
 
   int client_fd =
       accept_client(client_id, &client_address, &client_address_len);
+  if (client_fd < 0) {
+      syserr("accept");
+  }
 
-  std::string position = process_IAM_message(client_fd);
+  // Pobieranie adresu IP klienta (sender) i portu
+  char ip_sender[INET_ADDRSTRLEN];
+  inet_ntop(AF_INET, &client_address.sin_addr, ip_sender, sizeof(ip_sender));
+  uint16_t port_sender = ntohs(client_address.sin_port);
+
+  // Pobieranie lokalnego adresu IP (local) i portu
+  struct sockaddr_in local_address;
+  socklen_t local_address_len = sizeof(local_address);
+  if (getsockname(client_fd, (struct sockaddr *)&local_address, &local_address_len) == -1) {
+      syserr("getsockname");
+  }
+
+  char ip_local[INET_ADDRSTRLEN];
+  inet_ntop(AF_INET, &local_address.sin_addr, ip_local, sizeof(ip_local));
+  uint16_t port_local = ntohs(local_address.sin_port);
+
+  // Przekształcanie na std::string, aby dopasować do typu funkcji
+  std::string ip_sender_str(ip_sender);
+  std::string ip_local_str(ip_local);
+
+  std::string position = process_IAM_message(client_fd, ip_sender,port_sender,ip_local,port_local);
 
   if (position == "")
     syserr("error reading IAM");
@@ -472,7 +487,7 @@ void *handle_connection(void *client_id_ptr) {
                       deal.cards.at(position));
 
   pthread_barrier_wait(&clients_barrier);
-  trick_communication(client_id, position, client_fd);
+  trick_communication(client_id, position, client_fd, ip_sender,port_sender,ip_local,port_local);
   pthread_barrier_wait(&clients_barrier);
   send_score_to_client(client_fd);
   
@@ -494,13 +509,13 @@ int prepare_shared_variables(int socket_fd) {
     syserr("clients barrier initialization failed");
 
   if (pthread_mutex_init(&global_mutex, NULL) != 0) {
-    fprintf(stderr, "Failed to initialize mutex\n");
+    error("Failed to initialize mutex\n");
     return -1;
   }
 
   for (int i = 0; i < CLIENTS; i++) {
     if (pthread_mutex_init(&mutexes[i], NULL) != 0) {
-      fprintf(stderr, "Failed to initialize mutex %d\n", i);
+      error("Failed to initialize mutex %d\n", i);
       return 1;
     }
   }
@@ -508,7 +523,7 @@ int prepare_shared_variables(int socket_fd) {
   // Zablokowanie wszystkich muteksów poza jednym
   for (int i = 1; i < CLIENTS; i++) {
     if (pthread_mutex_lock(&mutexes[i]) != 0) {
-      fprintf(stderr, "Error locking mutex %d\n", i);
+      error("Error locking mutex %d\n", i);
       return 1;
     }
   }
@@ -523,12 +538,12 @@ int prepare_shared_variables(int socket_fd) {
     int *thread_id = (int *)malloc(sizeof(int));
     *thread_id = i;
     if (pthread_create(&threads[i], NULL, handle_connection, thread_id) != 0) {
-      fprintf(stderr, "Error creating thread %d\n", i);
+      error("Error creating thread %d\n", i);
       return -1;
     }
 
     if (pthread_detach(threads[i]) != 0) {
-      fprintf(stderr, "Error detaching thread %d\n", i);
+      error("Error detaching thread %d\n", i);
       return -1;
     }
   }

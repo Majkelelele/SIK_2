@@ -17,7 +17,10 @@ struct ClientParams {
 void printUsage();
 ClientParams parseArgumentsClient(int argc, char* argv[]);
 void send_IAM(int socket_fd, char place);
-std::vector<std::string> read_deal(int socket_fd);
-void read_score(int socket_fd);
+std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
+ uint16_t port_sender, char *ip_local, uint16_t port_local);
+void read_score(int socket_fd, char *ip_sender,
+ uint16_t port_sender, char *ip_local, uint16_t port_local);
+
 
 #endif
