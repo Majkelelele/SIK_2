@@ -88,7 +88,8 @@ ssize_t readn(int fd, char *buf, size_t buf_size) {
       delimiter_pos++;
       if (delimiter_pos == delimiter_len) {
         // Found the delimiter, so stop reading
-        totalRead -= delimiter_len;
+        // totalRead -= delimiter_len;
+        std::cout << "read: " << buf; 
         return totalRead;
       }
     } else {
@@ -149,7 +150,7 @@ int send_trick(int socket_fd, std::string card_list, int numer_lewy) {
            (std::to_string(numer_lewy)).c_str(), card_list.c_str());
 
   // Wysyłanie wiadomości
-  std::cout << "sending: " << line << '\n';
+  std::cout << "sending: " << line;
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
   ssize_t written_length = writen(socket_fd, line, data_to_send);
   if (written_length < 0) {
@@ -210,8 +211,8 @@ std::string read_trick(int socket_fd, std::string position, int expected_trick_n
                           << ", but got: " << trick_number_str << std::endl;
                 return card;
             }
-
-            card = message.substr(5 + expected_trick_number_str.length()); 
+            int next_to_read = 5 + expected_trick_number_str.length();
+            card = message.substr(next_to_read, message.length() - next_to_read - 2);
         } else {
             std::cerr << "Invalid message format. Expected message to start with 'TRICK'." 
                       << std::endl;

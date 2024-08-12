@@ -251,7 +251,7 @@ std::string process_IAM_message(int client_fd, const std::string &ip_sender,
   static std::map<int, std::string>
       client_buffers; // To store buffer per client
   char buffer[BUFFER_SIZE];
-  ssize_t received_bytes = read(client_fd, buffer, BUFFER_SIZE);
+  ssize_t received_bytes = readn(client_fd, buffer, BUFFER_SIZE);
 
   if (received_bytes < 0) {
     // Error occurred while reading
