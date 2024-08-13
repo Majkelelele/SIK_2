@@ -69,15 +69,25 @@ int main(int argc, char *argv[]) {
     uint16_t local_port = ntohs(local_address.sin_port);
     
     send_IAM(socket_fd,params.place);
-    std::vector<std::string> sortedCards = read_deal(socket_fd, ip_server, port_server, ip_local, local_port);
-
-    for(int i = 1; i <= ROUNDS; i++) {
-        read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
-        send_trick(socket_fd,sortedCards[i-1],i);
-        read_taken(socket_fd, ip_server, port_server, ip_local, local_port);
+    bool disconnected = false;
+    std::string result = "";
+    while(!disconnected) {
+        std::vector<std::string> sortedCards = read_deal(socket_fd, ip_server, port_server, ip_local, local_port);
+        if(sortedCards.size() == 0) disconnected = true;
+        for(int i = 1; !disconnected && i <= ROUNDS; i++) {
+            result = read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
+            if(result == "disconnected") {
+                disconnected = true;
+            } 
+            else {
+                send_trick(socket_fd,sortedCards[i-1],i);
+                read_taken(socket_fd, ip_server, port_server, ip_local, local_port);
+            }
+        }
+        if(!disconnected) read_score(socket_fd, ip_server, port_server, ip_local, local_port);
     }
     
-    read_score(socket_fd, ip_server, port_server, ip_local, local_port);
+    
 
     close(socket_fd);
     

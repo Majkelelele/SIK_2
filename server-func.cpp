@@ -43,17 +43,22 @@ int players_played_in_round;
 std::string who_won;
 
 std::map<std::string, int> position_id_map;
-std::map<std::string, int> total_points_map;
+std::map<std::string, int> total_points_round_map;
+std::map<std::string, int> total_points_overall_map;
 
 void initilizeMaps() {
   position_id_map["N"] = -1;
   position_id_map["E"] = -1;
   position_id_map["S"] = -1;
   position_id_map["W"] = -1;
-  total_points_map["N"] = 0;
-  total_points_map["E"] = 0;
-  total_points_map["S"] = 0;
-  total_points_map["W"] = 0;
+  total_points_round_map["N"] = 0;
+  total_points_round_map["E"] = 0;
+  total_points_round_map["S"] = 0;
+  total_points_round_map["W"] = 0;
+  total_points_overall_map["N"] = 0;
+  total_points_overall_map["E"] = 0;
+  total_points_overall_map["S"] = 0;
+  total_points_overall_map["W"] = 0;
 }
 
 // Funkcja do rozdzielenia linii na poszczególne karty
@@ -364,7 +369,8 @@ std::string summarize_trick() {
   int points_to_add = deals[0].dealType->countPoints(cards_in_round);
   std::string who_won = find_who_won();
   std:: cout << "Player " + who_won + " lost " + std::to_string(points_to_add) + " points" + '\n';
-  total_points_map.at(who_won) += points_to_add;
+  total_points_round_map.at(who_won) += points_to_add;
+  total_points_overall_map.at(who_won) += points_to_add;
   return who_won;
 }
 
@@ -372,7 +378,7 @@ void trick_communication(int client_id, std::string position, int client_fd, con
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
   if (client_id == CLIENTS - 1) {
     if (pthread_mutex_unlock(
-            &mutexes[position_id_map.at(deals[0].startingClient)]) != 0) {
+            &mutexes[position_id_map.at(deals[current_deal].startingClient)]) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
   }
@@ -421,7 +427,7 @@ void send_score_to_client(int client_fd) {
 
     // Tworzenie wiadomości SCORE
     std::string score_message = "SCORE";
-    for (const auto& pair : total_points_map) {
+    for (const auto& pair : total_points_round_map) {
       const std::string& position = pair.first;
       int score = pair.second;
       score_message += position + std::to_string(score);
@@ -441,6 +447,39 @@ void send_score_to_client(int client_fd) {
     }
 }
 
+void send_total_to_client(int client_fd) {
+    char line[BUFFER_SIZE];
+    memset(line, 0, BUFFER_SIZE);
+
+    // Tworzenie wiadomości TOTAL
+    std::string total_message = "TOTAL";
+    for (const auto& pair : total_points_overall_map) {
+        const std::string& position = pair.first;
+        int score = pair.second;
+        total_message += position + std::to_string(score);
+    }
+    total_message += "\r\n";
+
+    // Przekopiowanie wiadomości do bufora
+    snprintf(line, BUFFER_SIZE, "%s", total_message.c_str());
+
+    // Wysyłanie wiadomości
+    size_t data_to_send = strnlen(line, BUFFER_SIZE);
+    ssize_t written_length = writen(client_fd, line, data_to_send);
+    if (written_length < 0) {
+        syserr("writen");
+    } else if ((size_t)written_length != data_to_send) {
+        fatal("incomplete writen");
+    }
+}
+
+
+void clear_map() {
+  total_points_round_map["N"] = 0;
+  total_points_round_map["E"] = 0;
+  total_points_round_map["S"] = 0;
+  total_points_round_map["W"] = 0;
+}
 
 void *handle_connection(void *client_id_ptr) {
   struct sockaddr_in client_address;
@@ -485,19 +524,26 @@ void *handle_connection(void *client_id_ptr) {
   pthread_barrier_wait(&clients_barrier);
 
   // DEAL
-  Deal deal = deals[0];
-  std::string deal_type = deal.dealType->id;
-  send_deal_to_client(client_fd, deal_type, deal.startingClient,
-                      deal.cards.at(position));
+  for(size_t i = 0; i < deals.size(); i++) {
+    Deal deal = deals[i];
+    std::string deal_type = deal.dealType->id;
+    send_deal_to_client(client_fd, deal_type, deal.startingClient,
+                        deal.cards.at(position));
 
-  pthread_barrier_wait(&clients_barrier);
-  trick_communication(client_id, position, client_fd, ip_sender,port_sender,ip_local,port_local);
-  pthread_barrier_wait(&clients_barrier);
-  send_score_to_client(client_fd);
+    pthread_barrier_wait(&clients_barrier);
+    trick_communication(client_id, position, client_fd, ip_sender,port_sender,ip_local,port_local);
+    pthread_barrier_wait(&clients_barrier);
+    send_score_to_client(client_fd);
+    pthread_barrier_wait(&clients_barrier);
+    clear_map();
+    pthread_barrier_wait(&clients_barrier);
+  }
+  send_total_to_client(client_fd);
+  
   
 
   pthread_barrier_wait(&final_barrier);
-  std::cout << "total points received by " + position + " = " + std::to_string(total_points_map.at(position)) + "\n"; 
+  std::cout << "total points received by " + position + " = " + std::to_string(total_points_round_map.at(position)) + "\n"; 
 
   return 0;
 }

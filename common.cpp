@@ -190,11 +190,12 @@ std::string read_trick(int socket_fd, std::string position, int expected_trick_n
     std::string card;
 
     if (received_bytes < 0) {
+        close(socket_fd);
         error("error when reading message from connection");
-        close(socket_fd);
     } else if (received_bytes == 0) {
-        syserr("ending connection\n");
         close(socket_fd);
+        std::cout << "returning DISCONNECTED\n";
+        return "disconnected";
     } else {
         print_formatted_message(buffer,received_bytes,ip_sender,port_sender,ip_local,port_local);
         buffer[received_bytes] = '\0'; 
@@ -213,7 +214,10 @@ std::string read_trick(int socket_fd, std::string position, int expected_trick_n
             }
             int next_to_read = 5 + expected_trick_number_str.length();
             card = message.substr(next_to_read, message.length() - next_to_read - 2);
-        } else {
+        } else if(message.substr(0, 5) == "TOTAL") {
+          return "disconnected";
+        } 
+        else {
             std::cerr << "Invalid message format. Expected message to start with 'TRICK'." 
                       << std::endl;
         }

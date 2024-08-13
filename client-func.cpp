@@ -80,7 +80,7 @@ void send_IAM(int socket_fd, char place) {
 std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
  uint16_t port_sender, char *ip_local, uint16_t port_local) {
     char buffer[BUFFER_SIZE];
-    ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
+    ssize_t received_bytes = readn(socket_fd, buffer, BUFFER_SIZE);
     std::string card_list;
     if (received_bytes < 0) {
         error("error when reading message from connection");
@@ -102,7 +102,11 @@ std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
         if (message.substr(0, 4) == "DEAL") {
             deal_type = message.substr(4, 1); // Typ rozdania to jednoliterowy string
             card_list = message.substr(6, message.length() - 8); // Reszta to lista kart, -3 aby usunąć \r\n
-        } else {
+        } else if(message.substr(0, 5) == "TOTAL") {
+            std::vector<std::string> sortedCards;
+            return sortedCards;
+        } 
+        else {
             syserr("Invalid message format. Expected message to start with 'DEAL'.");
         }
     }
@@ -112,25 +116,27 @@ std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
 
 void read_score(int socket_fd, char *ip_sender, uint16_t port_sender, char *ip_local, uint16_t port_local) {
     char buffer[BUFFER_SIZE];
-    ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
+    ssize_t received_bytes = readn(socket_fd, buffer, BUFFER_SIZE);
 
-    if (received_bytes <= 0) {
-        error("error when reading message from connection");
+    if (received_bytes < 0) {
         close(socket_fd);
-    } else {
-        
-
+        error("error when reading message from connection");
+    } else if(received_bytes == 0){
+        close(socket_fd);
+        syserr("ending connection\n");
+    }
+    else {
         print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
     }
 }
 
+
 void read_taken(int socket_fd, const std::string &ip_sender, uint16_t port_sender, 
                 const std::string &ip_local, uint16_t port_local) {
     char buffer[BUFFER_SIZE];
-    ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
+    ssize_t received_bytes = readn(socket_fd, buffer, BUFFER_SIZE);
 
     if (received_bytes > 0) {
-        buffer[received_bytes] = '\0';  // Dodaj znak końca ciągu
         print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
     } else {
         // Obsługa błędów lub zakończenie połączenia
@@ -142,3 +148,17 @@ void read_taken(int socket_fd, const std::string &ip_sender, uint16_t port_sende
         close(socket_fd);
     }
 }
+
+void read_total(int socket_fd, char *ip_sender, uint16_t port_sender, char *ip_local, uint16_t port_local) {
+    char buffer[BUFFER_SIZE];
+    ssize_t received_bytes = readn(socket_fd, buffer, BUFFER_SIZE);
+
+    if (received_bytes <= 0) {
+        error("Error when reading message from connection");
+        close(socket_fd);
+    } else {
+        // Print the formatted message to the standard output
+        print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
+    }
+}
+

@@ -23,5 +23,7 @@ void read_score(int socket_fd, char *ip_sender,
  uint16_t port_sender, char *ip_local, uint16_t port_local);
 void read_taken(int socket_fd, const std::string &ip_sender, uint16_t port_sender, 
                 const std::string &ip_local, uint16_t port_local);
+void read_total(int socket_fd, char *ip_sender,
+ uint16_t port_sender, char *ip_local, uint16_t port_local);
 
 #endif
