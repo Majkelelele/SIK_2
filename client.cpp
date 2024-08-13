@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
     for(int i = 1; i <= ROUNDS; i++) {
         read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
         send_trick(socket_fd,sortedCards[i-1],i);
+        read_taken(socket_fd, ip_server, port_server, ip_local, local_port);
     }
     
     read_score(socket_fd, ip_server, port_server, ip_local, local_port);

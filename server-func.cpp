@@ -40,6 +40,7 @@ bool finish = false;
 std::string current_cards_list = "";
 int current_deal;
 int players_played_in_round;
+std::string who_won;
 
 std::map<std::string, int> position_id_map;
 std::map<std::string, int> total_points_map;
@@ -383,23 +384,20 @@ void trick_communication(int client_id, std::string position, int client_fd, con
     if (pthread_mutex_lock(&global_mutex) != 0) {
       syserr("Error locking mutex %d\n");
     }
-
+    players_played_in_round++;
+    if(players_played_in_round == 1) {
+      cards_in_round.clear();
+      current_cards_list = "";
+    }
     send_trick(client_fd, current_cards_list, i);
     current_cards_list += read_trick(client_fd, position, i, ip_sender, port_sender, ip_local, port_local);
     std::string next_position = find_who_next(position);
 
-    players_played_in_round++;
-
     if (players_played_in_round == 4) {
-      // for (size_t i = 0; i < cards_in_round.size(); i++) {
-      //   cards_in_round[i].printCard();
-      // }
       next_position = summarize_trick();
-      players_played_in_round = 0;
-      cards_in_round.clear();
-      current_cards_list = "";
+      who_won = next_position;
+      players_played_in_round = 0;  
     }
-
     int next_to_play = position_id_map.at(next_position);
 
     if (pthread_mutex_unlock(&global_mutex) != 0) {
@@ -408,6 +406,12 @@ void trick_communication(int client_id, std::string position, int client_fd, con
     if (pthread_mutex_unlock(&mutexes[next_to_play]) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
+
+    pthread_barrier_wait(&clients_barrier);
+    send_taken(client_fd,current_cards_list,i,who_won);
+    pthread_barrier_wait(&clients_barrier);
+
+
   }
 }
 
@@ -502,6 +506,7 @@ int prepare_shared_variables(int socket_fd) {
   current_deal = 0;
   pthread_t threads[CLIENTS];
   players_played_in_round = 0;
+  who_won = "";
 
   if (pthread_barrier_init(&final_barrier, NULL, CLIENTS + 1) != 0)
     syserr("final barrier initialization failed");
@@ -563,4 +568,28 @@ void destroy_and_finish() {
     syserr("final barrier destruction failed");
   if (pthread_barrier_destroy(&clients_barrier) != 0)
     syserr("clients barrier destruction failed");
+}
+
+int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position) {
+  char line[BUFFER_SIZE];
+  memset(line, 0, BUFFER_SIZE);
+
+  // Formatowanie wiadomości TAKEN
+  snprintf(line, BUFFER_SIZE, "TAKEN%s%s%s\r\n",
+           (std::to_string(numer_lewy)).c_str(), 
+           card_list.c_str(), 
+           client_position.c_str());
+
+  // Wysyłanie wiadomości
+  std::cout << "sending: " << line;
+  size_t data_to_send = strnlen(line, BUFFER_SIZE);
+  ssize_t written_length = writen(socket_fd, line, data_to_send);
+  
+  if (written_length < 0) {
+    syserr("writen");
+  } else if ((size_t)written_length != data_to_send) {
+    fatal("incomplete writen");
+  }
+  
+  return written_length;
 }

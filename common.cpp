@@ -143,7 +143,7 @@ uint16_t read_port(char const *string) {
 }
 
 int send_trick(int socket_fd, std::string card_list, int numer_lewy) {
-  static char line[BUFFER_SIZE];
+  char line[BUFFER_SIZE];
   memset(line, 0, BUFFER_SIZE);
 
   snprintf(line, BUFFER_SIZE, "TRICK%s%s\r\n",

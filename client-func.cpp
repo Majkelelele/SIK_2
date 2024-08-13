@@ -123,3 +123,22 @@ void read_score(int socket_fd, char *ip_sender, uint16_t port_sender, char *ip_l
         print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
     }
 }
+
+void read_taken(int socket_fd, const std::string &ip_sender, uint16_t port_sender, 
+                const std::string &ip_local, uint16_t port_local) {
+    char buffer[BUFFER_SIZE];
+    ssize_t received_bytes = read(socket_fd, buffer, BUFFER_SIZE);
+
+    if (received_bytes > 0) {
+        buffer[received_bytes] = '\0';  // Dodaj znak końca ciągu
+        print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
+    } else {
+        // Obsługa błędów lub zakończenie połączenia
+        if (received_bytes < 0) {
+            error("error when reading message from connection");
+        } else {
+            syserr("ending connection\n");
+        }
+        close(socket_fd);
+    }
+}

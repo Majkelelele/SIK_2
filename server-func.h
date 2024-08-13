@@ -22,6 +22,7 @@ extern bool finish;
 extern std::string current_cards_list;
 extern int current_deal;
 extern int players_played_in_round;
+extern std::string who_won;
 
 
 /* Print usage information. */
@@ -52,7 +53,7 @@ std::string process_IAM_message(int client_fd, const std::string &ip_sender,
 void trick_communication(int client_id, std::string position, int client_fd, const std::string &ip_sender,
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
  void send_score_to_client(int client_fd);
-
+int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position);
 
 
 #endif
