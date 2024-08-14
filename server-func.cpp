@@ -377,22 +377,26 @@ void trick_communication(int client_id, std::string position, int client_fd, con
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
 
   pthread_mutex_trylock(&mutexes[position_id_map.at(position)]);
+  pthread_barrier_wait(&clients_barrier);
   if (client_id == CLIENTS - 1) {
     if (pthread_mutex_unlock(
             &mutexes[position_id_map.at(deals[0].startingClient)]) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
   }
-  pthread_barrier_wait(&clients_barrier);
 
   for (int i = 1; i <= ROUNDS; i++) {
-
+    std::cout << "beefore mutexes trick comm!\n";
     if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
       syserr("Error locking mutex %d\n");
     }
+      std::cout << "after mutex private trick comm!\n";
+
     if (pthread_mutex_lock(&global_mutex) != 0) {
       syserr("Error locking mutex %d\n");
     }
+      std::cout << "after mutex global!\n";
+
     players_played_in_round++;
     if(players_played_in_round == 1) {
       cards_in_round.clear();
@@ -409,10 +413,10 @@ void trick_communication(int client_id, std::string position, int client_fd, con
     }
     int next_to_play = position_id_map.at(next_position);
 
-    if (pthread_mutex_unlock(&global_mutex) != 0) {
+    if (pthread_mutex_unlock(&mutexes[next_to_play]) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
-    if (pthread_mutex_unlock(&mutexes[next_to_play]) != 0) {
+    if (pthread_mutex_unlock(&global_mutex) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
 
@@ -528,7 +532,7 @@ void *handle_connection(void *client_id_ptr) {
 
   // DEAL
   for(size_t i = 0; i < deals.size(); i++) {
-    Deal deal = deals[i];
+    Deal deal = deals[0];
     std::string deal_type = deal.dealType->id;
     send_deal_to_client(client_fd, deal_type, deal.startingClient,
                         deal.cards.at(position));
