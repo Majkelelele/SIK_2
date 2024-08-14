@@ -51,7 +51,7 @@ int accept_client(int client_id, struct sockaddr_in *client_address, socklen_t *
 std::string process_IAM_message(int client_fd, const std::string &ip_sender,
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 void trick_communication(int client_id, std::string position, int client_fd, const std::string &ip_sender,
- uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local, int current_round);
  void send_score_to_client(int client_fd);
 int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position);
 void send_total_to_client(int client_fd);

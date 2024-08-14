@@ -89,7 +89,6 @@ ssize_t readn(int fd, char *buf, size_t buf_size) {
       if (delimiter_pos == delimiter_len) {
         // Found the delimiter, so stop reading
         // totalRead -= delimiter_len;
-        std::cout << "read: " << buf; 
         return totalRead;
       }
     } else {
@@ -149,8 +148,6 @@ int send_trick(int socket_fd, std::string card_list, int numer_lewy) {
   snprintf(line, BUFFER_SIZE, "TRICK%s%s\r\n",
            (std::to_string(numer_lewy)).c_str(), card_list.c_str());
 
-  // Wysyłanie wiadomości
-  std::cout << "sending: " << line;
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
   ssize_t written_length = writen(socket_fd, line, data_to_send);
   if (written_length < 0) {
@@ -194,7 +191,6 @@ std::string read_trick(int socket_fd, std::string position, int expected_trick_n
         error("error when reading message from connection");
     } else if (received_bytes == 0) {
         close(socket_fd);
-        std::cout << "returning DISCONNECTED\n";
         return "disconnected";
     } else {
         print_formatted_message(buffer,received_bytes,ip_sender,port_sender,ip_local,port_local);
@@ -318,6 +314,7 @@ void print_formatted_message(char *buffer, ssize_t received_bytes, const std::st
     } else if (static_cast<size_t>(bytes_written) != static_cast<size_t>(received_bytes)) {
         syserr("Incomplete message written to stdout");
     }
+    std::cout << "printed " << bytes_written << "bytes\n";
 }
 
 

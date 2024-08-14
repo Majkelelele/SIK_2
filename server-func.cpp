@@ -263,8 +263,6 @@ std::string process_IAM_message(int client_fd, const std::string &ip_sender,
     client_fd = -1; // Mark the fd as closed
     return "";
   } else if (received_bytes == 0) {
-    // Connection closed by the client
-    std::cout << "Ending connection (" << client_fd << ")\n";
     close(client_fd);
     client_fd = -1; // Mark the fd as closed
     return "";
@@ -365,7 +363,6 @@ std::string summarize_trick() {
 
   int points_to_add = deals[0].dealType->countPoints(cards_in_round);
   std::string who_won = find_who_won();
-  std:: cout << "Player " + who_won + " lost " + std::to_string(points_to_add) + " points" + '\n';
   total_points_round_map.at(who_won) += points_to_add;
   total_points_overall_map.at(who_won) += points_to_add;
   return who_won;
@@ -374,28 +371,25 @@ std::string summarize_trick() {
 
 
 void trick_communication(int client_id, std::string position, int client_fd, const std::string &ip_sender,
- uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local, int current_round) {
 
   pthread_mutex_trylock(&mutexes[position_id_map.at(position)]);
   pthread_barrier_wait(&clients_barrier);
   if (client_id == CLIENTS - 1) {
     if (pthread_mutex_unlock(
-            &mutexes[position_id_map.at(deals[0].startingClient)]) != 0) {
+            &mutexes[position_id_map.at(deals[current_round].startingClient)]) != 0) {
       syserr("Error unlocking mutex %d\n");
     }
   }
 
   for (int i = 1; i <= ROUNDS; i++) {
-    std::cout << "beefore mutexes trick comm!\n";
     if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
       syserr("Error locking mutex %d\n");
     }
-      std::cout << "after mutex private trick comm!\n";
 
     if (pthread_mutex_lock(&global_mutex) != 0) {
       syserr("Error locking mutex %d\n");
     }
-      std::cout << "after mutex global!\n";
 
     players_played_in_round++;
     if(players_played_in_round == 1) {
@@ -532,14 +526,14 @@ void *handle_connection(void *client_id_ptr) {
 
   // DEAL
   for(size_t i = 0; i < deals.size(); i++) {
-    Deal deal = deals[0];
+    Deal deal = deals[i];
     std::string deal_type = deal.dealType->id;
     send_deal_to_client(client_fd, deal_type, deal.startingClient,
                         deal.cards.at(position));
     
 
     pthread_barrier_wait(&clients_barrier);
-    trick_communication(client_id, position, client_fd, ip_sender,port_sender,ip_local,port_local);
+    trick_communication(client_id, position, client_fd, ip_sender,port_sender,ip_local,port_local,i);
     pthread_barrier_wait(&clients_barrier);
     send_score_to_client(client_fd);
     pthread_barrier_wait(&clients_barrier);
@@ -551,7 +545,6 @@ void *handle_connection(void *client_id_ptr) {
   
 
   pthread_barrier_wait(&final_barrier);
-  std::cout << "total points received by " + position + " = " + std::to_string(total_points_round_map.at(position)) + "\n"; 
 
   return 0;
 }
@@ -634,8 +627,6 @@ int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string
            card_list.c_str(), 
            client_position.c_str());
 
-  // Wysyłanie wiadomości
-  std::cout << "sending: " << line;
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
   ssize_t written_length = writen(socket_fd, line, data_to_send);
   
