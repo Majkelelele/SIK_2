@@ -23,11 +23,6 @@
 static const char exit_string[] = "exit";
 
 int main(int argc, char *argv[]) {
-    if (argc < 6) {
-        printUsage();
-        return 1;
-    }
-
     ClientParams params = parseArgumentsClient(argc, argv);
     struct sockaddr_in server_address = get_server_address(params.host.c_str(), params.port);    
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);

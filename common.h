@@ -63,7 +63,6 @@ public:
 
 extern std::vector<Card> cards_in_round;
 
-struct sockaddr_in get_server_address(char const *host, uint16_t port);
 ssize_t readn(int fd, char *buf, size_t buf_size);
 ssize_t	writen(int fd, const void *vptr, size_t n);
 void install_signal_handler(int signal, void (*handler)(int), int flags);

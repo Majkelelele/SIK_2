@@ -33,29 +33,7 @@
 
 std::vector<Card> cards_in_round;
 
-struct sockaddr_in get_server_address(char const *host, uint16_t port) {
-  struct addrinfo hints;
-  memset(&hints, 0, sizeof(struct addrinfo));
-  hints.ai_family = AF_INET; // IPv4
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_protocol = IPPROTO_TCP;
 
-  struct addrinfo *address_result;
-  int errcode = getaddrinfo(host, NULL, &hints, &address_result);
-  if (errcode != 0) {
-    fatal("getaddrinfo: %s", gai_strerror(errcode));
-  }
-
-  struct sockaddr_in send_address;
-  send_address.sin_family = AF_INET; // IPv4
-  send_address.sin_addr.s_addr =     // IP address
-      ((struct sockaddr_in *)(address_result->ai_addr))->sin_addr.s_addr;
-  send_address.sin_port = htons(port); // port from the command line
-
-  freeaddrinfo(address_result);
-
-  return send_address;
-}
 
 
 ssize_t readn(int fd, char *buf, size_t buf_size) {
