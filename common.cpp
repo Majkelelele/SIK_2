@@ -118,7 +118,8 @@ uint16_t read_port(char const *string) {
   return (uint16_t)port;
 }
 
-int send_trick(int socket_fd, std::string card_list, int numer_lewy) {
+int send_trick(int socket_fd, std::string card_list, int numer_lewy,
+const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
   char line[BUFFER_SIZE];
   memset(line, 0, BUFFER_SIZE);
 
@@ -126,6 +127,7 @@ int send_trick(int socket_fd, std::string card_list, int numer_lewy) {
            (std::to_string(numer_lewy)).c_str(), card_list.c_str());
 
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
+  print_formatted_message(line, data_to_send, ip_local, port_local, ip_sender, port_sender);
   ssize_t written_length = writen(socket_fd, line, data_to_send);
   if (written_length < 0) {
     syserr("writen");
@@ -260,22 +262,26 @@ void print_formatted_message(char *buffer, ssize_t received_bytes, const std::st
 
     std::string header_str = output_message.str();
 
-    // Wypisanie nagłówka na stdout za pomocą write
-    ssize_t bytes_written = write(STDOUT_FILENO, header_str.c_str(), header_str.size());
+    // Łączenie nagłówka i treści wiadomości
+    std::string combined_message = header_str + std::string(buffer, received_bytes);
+
+    // Wypisanie całej wiadomości na stdout za pomocą write
+    ssize_t bytes_written = write(STDOUT_FILENO, combined_message.c_str(), combined_message.size());
+
     if (bytes_written < 0) {
-        error("Error writing header to stdout");
-    } else if (static_cast<size_t>(bytes_written) != header_str.size()) {
-        syserr("Incomplete header written to stdout");
+        error("Error writing combined message to stdout");
+    } else if (static_cast<size_t>(bytes_written) != combined_message.size()) {
+        syserr("Incomplete combined message written to stdout");
     }
 
-    // Wypisanie treści wiadomości na stdout bez modyfikacji za pomocą write
-    bytes_written = write(STDOUT_FILENO, buffer, received_bytes);
-    if (bytes_written < 0) {
-        error("Error writing message to stdout");
-    } else if (static_cast<size_t>(bytes_written) != static_cast<size_t>(received_bytes)) {
-        syserr("Incomplete message written to stdout");
+    // Natychmiastowe spłukanie buforów, aby upewnić się, że dane zostały wysłane
+    if (fflush(stdout) != 0) {
+        perror("fflush");
+        exit(EXIT_FAILURE);
     }
-    std::cout << "printed " << bytes_written << "bytes\n";
+
+  std::cout << "Printed " << (combined_message.size() - header_str.size()) << " bytes\n";
 }
+
 
 

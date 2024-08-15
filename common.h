@@ -55,6 +55,10 @@ public:
     void printCard() {
         std::cout << "Player: " << gracz << ", Value: " << wartosc << ", Color: " << color << std::endl;
     }
+
+    std::string toString() {
+        return wartosc + color;
+    }
 };
 
 extern std::vector<Card> cards_in_round;
@@ -64,7 +68,8 @@ ssize_t readn(int fd, char *buf, size_t buf_size);
 ssize_t	writen(int fd, const void *vptr, size_t n);
 void install_signal_handler(int signal, void (*handler)(int), int flags);
 uint16_t read_port(char const *string);
-int send_trick(int socket_fd, std::string card_list, int numer_lewy);
+int send_trick(int socket_fd, std::string card_list, int numer_lewy,
+const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 std::string read_trick(int socket_fd, std::string position, int expected_trick_number,
  const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 std::vector<std::string> parseCards(const std::string& cardString);

@@ -210,8 +210,8 @@ void parseArguments(int argc, char *argv[], int *port, std::string *file,
 }
 
 void send_deal_to_client(int client_fd, const std::string &deal_type,
-                         std::string starting_client,
-                         const std::vector<std::string> &cards) {
+  std::string starting_client,const std::vector<std::string> &cards,const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
   char line[BUFFER_SIZE];
   memset(line, 0, BUFFER_SIZE);
 
@@ -223,8 +223,10 @@ void send_deal_to_client(int client_fd, const std::string &deal_type,
 
   snprintf(line, BUFFER_SIZE, "DEAL%s%s%s\r\n", deal_type.c_str(),
            starting_client.c_str(), card_list.c_str());
-
+  
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
+  print_formatted_message(line, data_to_send, ip_local, port_local, ip_sender, port_sender);
+
   ssize_t written_length = writen(client_fd, line, data_to_send);
   if (written_length < 0) {
     syserr("writen");
@@ -369,7 +371,7 @@ void trick_communication(int client_id, std::string position, int client_fd, con
       cards_in_round.clear();
       current_cards_list = "";
     }
-    send_trick(client_fd, current_cards_list, i);
+    send_trick(client_fd, current_cards_list, i, ip_sender, port_sender, ip_local, port_local);
     current_cards_list += read_trick(client_fd, position, i, ip_sender, port_sender, ip_local, port_local);
     std::string next_position = find_who_next(position);
 
@@ -388,12 +390,13 @@ void trick_communication(int client_id, std::string position, int client_fd, con
     }
 
     pthread_barrier_wait(&clients_barrier);
-    send_taken(client_fd,current_cards_list,i,who_won);
+    send_taken(client_fd,current_cards_list,i,who_won,ip_sender, port_sender, ip_local, port_local);
     pthread_barrier_wait(&clients_barrier);
   }
 }
 
-void send_score_to_client(int client_fd) {
+void send_score_to_client(int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
     char line[BUFFER_SIZE];
     memset(line, 0, BUFFER_SIZE);
 
@@ -406,6 +409,7 @@ void send_score_to_client(int client_fd) {
     score_message += "\r\n";
     snprintf(line, BUFFER_SIZE, "%s", score_message.c_str());
     size_t data_to_send = strnlen(line, BUFFER_SIZE);
+    print_formatted_message(line, data_to_send, ip_local, port_local, ip_sender, port_sender);
     ssize_t written_length = writen(client_fd, line, data_to_send);
     if (written_length < 0) {
         error("writen");
@@ -414,7 +418,8 @@ void send_score_to_client(int client_fd) {
     }
 }
 
-void send_total_to_client(int client_fd) {
+void send_total_to_client(int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
     char line[BUFFER_SIZE];
     memset(line, 0, BUFFER_SIZE);
 
@@ -429,6 +434,7 @@ void send_total_to_client(int client_fd) {
     snprintf(line, BUFFER_SIZE, "%s", total_message.c_str());
 
     size_t data_to_send = strnlen(line, BUFFER_SIZE);
+    print_formatted_message(line, data_to_send,ip_local, port_local, ip_sender, port_sender);
     ssize_t written_length = writen(client_fd, line, data_to_send);
     if (written_length < 0) {
         syserr("writen");
@@ -490,18 +496,18 @@ void *handle_connection(void *client_id_ptr) {
     Deal deal = deals[i];
     std::string deal_type = deal.dealType->id;
     send_deal_to_client(client_fd, deal_type, deal.startingClient,
-                        deal.cards.at(position));
+      deal.cards.at(position),ip_sender,port_sender,ip_local,port_local);
     
 
     pthread_barrier_wait(&clients_barrier);
     trick_communication(client_id, position, client_fd, ip_sender,port_sender,ip_local,port_local,i);
     pthread_barrier_wait(&clients_barrier);
-    send_score_to_client(client_fd);
+    send_score_to_client(client_fd,ip_sender,port_sender,ip_local,port_local);
     pthread_barrier_wait(&clients_barrier);
     clear_map();
     pthread_barrier_wait(&clients_barrier);
   }
-  send_total_to_client(client_fd);
+  send_total_to_client(client_fd,ip_sender,port_sender,ip_local,port_local);
   
   
 
@@ -578,7 +584,8 @@ void destroy_and_finish() {
     syserr("clients barrier destruction failed");
 }
 
-int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position) {
+int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position,
+const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
   char line[BUFFER_SIZE];
   memset(line, 0, BUFFER_SIZE);
 
@@ -590,7 +597,7 @@ int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string
 
   size_t data_to_send = strnlen(line, BUFFER_SIZE);
   ssize_t written_length = writen(socket_fd, line, data_to_send);
-  
+  print_formatted_message(line, data_to_send, ip_local, port_local, ip_sender, port_sender);
   if (written_length < 0) {
     syserr("writen");
   } else if ((size_t)written_length != data_to_send) {

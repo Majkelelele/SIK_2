@@ -62,13 +62,15 @@ ClientParams parseArgumentsClient(int argc, char* argv[]) {
     return params;
 }
 
-void send_IAM(int socket_fd, char place) {
+void send_IAM(int socket_fd, char place, char *ip_sender,
+ uint16_t port_sender, char *ip_local, uint16_t port_local) {
     static char line[BUFFER_SIZE];
     memset(line, 0, BUFFER_SIZE);
     snprintf(line, BUFFER_SIZE, "IAM%c\r\n", place);
-
+    
     // Wysyłanie wiadomości
     size_t data_to_send = strnlen(line, BUFFER_SIZE);
+    print_formatted_message(line, data_to_send, ip_local, port_local, ip_sender, port_sender);
     ssize_t written_length = writen(socket_fd, line, data_to_send);
     if (written_length < 0) {
         syserr("writen");
@@ -77,11 +79,12 @@ void send_IAM(int socket_fd, char place) {
     }
 }
 
-std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
+std::vector<Card> read_deal(int socket_fd, char *ip_sender,
  uint16_t port_sender, char *ip_local, uint16_t port_local) {
     char buffer[BUFFER_SIZE];
     ssize_t received_bytes = readn(socket_fd, buffer, BUFFER_SIZE);
     std::string card_list;
+    std::vector<Card> cards;
     if (received_bytes < 0) {
         close(socket_fd);
         error("error when reading message from connection");
@@ -90,7 +93,7 @@ std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
         error("ending connection\n");
     } else {
         print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
-
+        
         buffer[received_bytes] = '\0';  
         std::string message(buffer);
         std::string deal_type;
@@ -99,15 +102,18 @@ std::vector<std::string> read_deal(int socket_fd, char *ip_sender,
             deal_type = message.substr(4, 1); // Typ rozdania to jednoliterowy string
             card_list = message.substr(6, message.length() - 8); // Reszta to lista kart, -3 aby usunąć \r\n
         } else if(message.substr(0, 5) == "TOTAL") { 
-            std::vector<std::string> sortedCards;
-            return sortedCards;
+            return cards;
         } 
         else {
             error("Invalid message format. Expected message to start with 'DEAL'.");
         }
     }
     std::vector<std::string> sortedCards = parseCards(card_list);
-    return sortedCards;
+
+    for(size_t i = 0; i < sortedCards.size(); i++) {
+        cards.push_back(createCardFromString(sortedCards[i],"CLIENT"));
+    }
+    return cards;
 }
 
 void read_score(int socket_fd, char *ip_sender, uint16_t port_sender, char *ip_local, uint16_t port_local) {
@@ -159,5 +165,40 @@ void read_total(int socket_fd, char *ip_sender, uint16_t port_sender, char *ip_l
     else {
         print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
     }
+}
+
+
+Card choose_card(std::string card_list, std::vector<Card> &remaining_cards) {
+    // Przekształć listę kart w wektor obiektów Card
+    std::vector<std::string> current_cards = parseCards(card_list);
+    std::vector<Card> cards;
+    for (size_t i = 0; i < current_cards.size(); i++) {
+        cards.push_back(createCardFromString(current_cards[i], "CLIENT"));
+    }
+
+    if (cards.empty()) {
+        int random_index = 0;
+        Card chosen_card = remaining_cards[random_index];
+        remaining_cards.erase(remaining_cards.begin() + random_index); // Usuń wybraną kartę
+        return chosen_card;
+    }
+
+    // Sprawdź kolor pierwszej karty
+    std::string first_card_color = cards[0].getColor();
+
+    // Szukaj karty z remaining_cards o takim samym kolorze
+    for (size_t i = 0; i < remaining_cards.size(); i++) {
+        if (remaining_cards[i].getColor() == first_card_color) {
+            Card chosen_card = remaining_cards[i];
+            remaining_cards.erase(remaining_cards.begin() + i); // Usuń wybraną kartę
+            return chosen_card;
+        }
+    }
+
+    // Jeśli nie znaleziono karty o takim samym kolorze, wybierz losową kartę
+    int random_index = 0;
+    Card chosen_card = remaining_cards[random_index];
+    remaining_cards.erase(remaining_cards.begin() + random_index); // Usuń wybraną kartę
+    return chosen_card;
 }
 

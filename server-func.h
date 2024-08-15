@@ -39,10 +39,9 @@ std::vector<std::string> splitCards(const std::string& line);
 void parseDealsFromFile(const std::string& filename);
 void printDeals(const std::vector<Deal>& deals);
 void initilizeMap();
-void send_deal_to_client(int socket_fd, const std::string& deal_type, 
-char starting_client, const std::vector<std::string>& cards);
-void send_deal_to_clients(struct pollfd *poll_descriptors, const Deal& deal,
-std::map<std::string, int> *position_fd_index);
+void send_deal_to_client(int client_fd, const std::string &deal_type,
+  std::string starting_client,const std::vector<std::string> &cards,const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 std::string find_who_next(std:: string current);
 void *handle_connection(void *client_fd_ptr);
 int start_server(int socket_fd);
@@ -52,9 +51,12 @@ std::string process_IAM_message(int client_fd, const std::string &ip_sender,
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 void trick_communication(int client_id, std::string position, int client_fd, const std::string &ip_sender,
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local, int current_round);
- void send_score_to_client(int client_fd);
-int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position);
-void send_total_to_client(int client_fd);
+void send_score_to_client(int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
+int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position,
+const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
+void send_total_to_client(int client_fd, const std::string &ip_sender,
+ uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
 std::string summarize_trick(int current_round, int trick_number);
 
 
