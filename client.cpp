@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
             Card choosen_card = choose_card(card_list, remaining_cards);
             std::cout << "remaining cards size = " << remaining_cards.size() << "\n";
             
-            send_trick(socket_fd,choosen_card.toString(),i,ip_server, port_server, ip_local, local_port);
+            send_trick(socket_fd,choosen_card.toString(),i, ip_server, port_server, ip_local, local_port);
             read_taken(socket_fd, ip_server, port_server, ip_local, local_port);
         }
         if(!disconnected) read_score(socket_fd, ip_server, port_server, ip_local, local_port);

@@ -280,7 +280,8 @@ void print_formatted_message(char *buffer, ssize_t received_bytes, const std::st
         exit(EXIT_FAILURE);
     }
 
-  std::cout << "Printed " << (combined_message.size() - header_str.size()) << " bytes\n";
+    std::cout << "Printed " << (combined_message.size() - header_str.size()) << " bytes\n";
+
 }
 
 
