@@ -23,20 +23,13 @@
 static const char exit_string[] = "exit";
 
 int main(int argc, char *argv[]) {
-    
-
     if (argc < 6) {
         printUsage();
         return 1;
     }
 
     ClientParams params = parseArgumentsClient(argc, argv);
-  
-    
-    
-    struct sockaddr_in server_address = get_server_address(params.host.c_str(), params.port);
-
-    
+    struct sockaddr_in server_address = get_server_address(params.host.c_str(), params.port);    
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd < 0) {
         syserr("cannot create a socket");
@@ -72,11 +65,14 @@ int main(int argc, char *argv[]) {
     bool disconnected = false;
     std::string result = "";
     while(!disconnected) {
-        std::vector<std::string> sortedCards = read_deal(socket_fd, ip_server, port_server, ip_local, local_port);
-        if(sortedCards.size() == 0) disconnected = true;
+        std::vector<std::string> cards = read_deal(socket_fd, ip_server, port_server, ip_local, local_port);
+        
+        if(cards.size() == 0) disconnected = true;
         for(int i = 1; !disconnected && i <= ROUNDS; i++) {
-            read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
-            send_trick(socket_fd,sortedCards[i-1],i);
+            std::string card_list = read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
+            std::vector<std::string> current_cards = parseCards(card_list);
+            
+            send_trick(socket_fd,cards[i-1],i);
             read_taken(socket_fd, ip_server, port_server, ip_local, local_port);
         }
         if(!disconnected) read_score(socket_fd, ip_server, port_server, ip_local, local_port);

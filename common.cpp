@@ -57,9 +57,7 @@ struct sockaddr_in get_server_address(char const *host, uint16_t port) {
   return send_address;
 }
 
-// Following two functions come from Stevens' "UNIX Network Programming" book.
-// Read n bytes from a descriptor. Use in place of read() when fd is a stream
-// socket.
+
 ssize_t readn(int fd, char *buf, size_t buf_size) {
   ssize_t nread;
   size_t totalRead = 0;
@@ -68,27 +66,21 @@ ssize_t readn(int fd, char *buf, size_t buf_size) {
   size_t delimiter_len = delimiter.length();
   size_t delimiter_pos = 0;
   while (totalRead < buf_size) {
-    nread = read(fd, &c, 1); // Read one character at a time
+    nread = read(fd, &c, 1); 
     if (nread < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        // Non-blocking read would block, so just return what we've read so far
         return totalRead;
       } else {
-        // Error in reading
         return -1;
       }
     } else if (nread == 0) {
-      // End of file
       break;
     }
-    buf[totalRead++] = c; // Add character to buffer
+    buf[totalRead++] = c; 
 
-    // Check if the characters in tail form the delimiter
     if (c == delimiter[delimiter_pos]) {
       delimiter_pos++;
       if (delimiter_pos == delimiter_len) {
-        // Found the delimiter, so stop reading
-        // totalRead -= delimiter_len;
         return totalRead;
       }
     } else {
@@ -99,12 +91,10 @@ ssize_t readn(int fd, char *buf, size_t buf_size) {
 }
 
 
-// Write n bytes to a descriptor.
 ssize_t writen(int fd, const void *vptr, size_t n) {
   ssize_t nleft, nwritten;
   const char *ptr;
 
-  // Explicitly cast vptr to const char *
   ptr = static_cast<const char *>(vptr);
   nleft = n;
   while (nleft > 0) {
@@ -117,19 +107,6 @@ ssize_t writen(int fd, const void *vptr, size_t n) {
   return n;
 }
 
-void install_signal_handler(int signal, void (*handler)(int), int flags) {
-  struct sigaction action;
-  sigset_t block_mask;
-
-  sigemptyset(&block_mask);
-  action.sa_handler = handler;
-  action.sa_mask = block_mask;
-  action.sa_flags = flags;
-
-  if (sigaction(signal, &action, NULL) < 0) {
-    syserr("sigaction");
-  }
-}
 
 uint16_t read_port(char const *string) {
   char *endptr;
@@ -168,11 +145,11 @@ Card createCardFromString(const std::string &cardStr,
 
   // Determine if cardStr has a 2-character value (like "10") or 1-character
   if (cardStr.length() == 3) {
-      value = cardStr.substr(0, 2);  // for "10"
-      color = cardStr.substr(2, 1);  // the third character
+      value = cardStr.substr(0, 2);
+      color = cardStr.substr(2, 1);  
   } else {
-      value = cardStr.substr(0, 1);  // first character
-      color = cardStr.substr(1, 1);  // second character
+      value = cardStr.substr(0, 1);  
+      color = cardStr.substr(1, 1);  
   }
   return Card(gracz, value, color);
 }
@@ -230,17 +207,10 @@ std::unordered_map<std::string, int> createCardValueMap() {
           {"Q", 12}, {"K", 13}, {"A", 14}};
 }
 
-// Funkcja porównawcza dla sortowania kart
-bool compareCards(const std::string &card1, const std::string &card2,
-                  const std::unordered_map<std::string, int> &cardValueMap) {
-  if (cardValueMap.count(card1) && cardValueMap.count(card2)) {
-    return cardValueMap.at(card1) < cardValueMap.at(card2);
-  }
-  return false; // Zabezpieczenie w przypadku braku klucza w mapie
-}
 
-// Funkcja parsująca ciąg kart i zwracająca posortowane karty
-std::vector<std::string> parseAndSortCards(const std::string &cardString) {
+
+
+std::vector<std::string> parseCards(const std::string &cardString) {
   std::unordered_map<std::string, int> cardValueMap = createCardValueMap();
   std::vector<std::string> cards;
 
@@ -254,13 +224,6 @@ std::vector<std::string> parseAndSortCards(const std::string &cardString) {
       cards.push_back(cardString.substr(i, 2));
     }
   }
-
-  // // Sortowanie kart
-  // std::sort(cards.begin(), cards.end(), [&cardValueMap](const std::string&
-  // card1, const std::string& card2) {
-  //     return compareCards(card1, card2, cardValueMap);
-  // });
-
   return cards;
 }
 
@@ -290,13 +253,11 @@ void print_formatted_message(char *buffer, ssize_t received_bytes, const std::st
     timestamp << std::put_time(std::localtime(&now_time), "%Y-%m-%dT%H:%M:%S");
     timestamp << '.' << std::setw(3) << std::setfill('0') << now_ms.count();
 
-    // Tworzenie wiadomości wyjściowej w zadanym formacie
     std::stringstream output_message;
     output_message << "[" << ip_sender << ":" << port_sender << ","
                    << ip_local << ":" << port_local << ","
                    << timestamp.str() << "] ";
 
-    // Konwersja nagłówka do stringa
     std::string header_str = output_message.str();
 
     // Wypisanie nagłówka na stdout za pomocą write

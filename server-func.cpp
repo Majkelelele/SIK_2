@@ -42,6 +42,7 @@ int current_deal;
 int players_played_in_round;
 std::string who_won;
 
+
 std::map<std::string, int> position_id_map;
 std::map<std::string, int> total_points_round_map;
 std::map<std::string, int> total_points_overall_map;
@@ -159,7 +160,7 @@ void printDeals(const std::vector<Deal> &deals) {
 }
 
 void printUsage() {
-  std::cout << "Usage: server [-p <port>] -f <file> [-t <timeout>]\n";
+  error("Usage: server [-p <port>] -f <file> [-t <timeout>]\n");
 }
 
 void parseArguments(int argc, char *argv[], int *port, std::string *file,
@@ -196,22 +197,16 @@ void parseArguments(int argc, char *argv[], int *port, std::string *file,
 
   // Validate required arguments
   if (args.find("-f") == args.end()) {
-    std::cerr << "Error: The -f <file> parameter is mandatory.\n";
     printUsage();
-    exit(EXIT_FAILURE);
+    error("The -f <file> parameter is mandatory.\n");
   }
-
-  // // Extract arguments
-  // if (args.find("-p") != args.end()) {
-  //     *port = args["-p"];
-  // }
 
   *file = args["-f"];
 
   if (args.find("-t") != args.end()) {
     *timeout = std::stoi(args["-t"]);
   }
-  *timeout = *timeout * 1000;
+  *timeout = *timeout * MILISECONDS_IN_SECOND;
 }
 
 void send_deal_to_client(int client_fd, const std::string &deal_type,
@@ -251,58 +246,37 @@ std::string find_who_next(std::string current) {
 
 std::string process_IAM_message(int client_fd, const std::string &ip_sender,
  uint16_t port_sender, const std::string &ip_local, uint16_t port_local) {
-  static std::map<int, std::string>
-      client_buffers; // To store buffer per client
   char buffer[BUFFER_SIZE];
   ssize_t received_bytes = readn(client_fd, buffer, BUFFER_SIZE);
 
   if (received_bytes < 0) {
-    // Error occurred while reading
-    error("Error when reading message from connection", client_fd);
     close(client_fd);
-    client_fd = -1; // Mark the fd as closed
-    return "";
+    error("Error when reading message from connection", client_fd);
   } else if (received_bytes == 0) {
     close(client_fd);
-    client_fd = -1; // Mark the fd as closed
+    client_fd = -1; 
     return "";
   } else {
-    // Accumulate data in the local buffer for the client
-    std::string &client_buffer = client_buffers[client_fd];
-    client_buffer.append(buffer, received_bytes);
+    std::string message_buffer(buffer, received_bytes);
 
-    // Define message boundaries
     const std::string prefix = "IAM";
     const std::string suffix = "\r\n";
 
     size_t start_pos = 0;
-    while ((start_pos = client_buffer.find(prefix, start_pos)) !=
-           std::string::npos) {
-      size_t end_pos = client_buffer.find(suffix, start_pos + prefix.size());
+    while ((start_pos = message_buffer.find(prefix, start_pos)) != std::string::npos) {
+        size_t end_pos = message_buffer.find(suffix, start_pos + prefix.size());
 
-      if (end_pos != std::string::npos) {
-        // Extract the complete message
-        std::string message = client_buffer.substr(
-            start_pos, end_pos + suffix.size() - start_pos);
-
-        // Remove processed message from buffer
-        client_buffer.erase(0, end_pos + suffix.size());
-
-        // Process the message
-        std::string place = message.substr(
-            prefix.size(), message.size() - prefix.size() - suffix.size());
-
-        print_formatted_message(buffer,received_bytes,ip_sender,port_sender,ip_local,port_local);
-        // Return the place extracted from the message
-        return place;
-      } else {
-        // No complete message found yet, break the loop and wait for more data
-        break;
-      }
+        if (end_pos != std::string::npos) {
+            std::string message = message_buffer.substr(start_pos, end_pos + suffix.size() - start_pos);
+            std::string place = message.substr(prefix.size(), message.size() - prefix.size() - suffix.size());
+            print_formatted_message(buffer, received_bytes, ip_sender, port_sender, ip_local, port_local);
+            return place;
+        } 
     }
   }
   return "";
-}
+} 
+
 
 void assign_position_to_index(std::string pos, int id) {
   if (pthread_mutex_lock(&global_mutex) != 0) {
@@ -359,9 +333,8 @@ std::string find_who_won() {
   return winningCard->getGracz();
 };
 
-std::string summarize_trick() {
-
-  int points_to_add = deals[0].dealType->countPoints(cards_in_round);
+std::string summarize_trick(int current_round, int trick_number) {
+  int points_to_add = deals[current_round].dealType->countPoints(cards_in_round, trick_number);
   std::string who_won = find_who_won();
   total_points_round_map.at(who_won) += points_to_add;
   total_points_overall_map.at(who_won) += points_to_add;
@@ -378,17 +351,17 @@ void trick_communication(int client_id, std::string position, int client_fd, con
   if (client_id == CLIENTS - 1) {
     if (pthread_mutex_unlock(
             &mutexes[position_id_map.at(deals[current_round].startingClient)]) != 0) {
-      syserr("Error unlocking mutex %d\n");
+      error("Error unlocking mutex %d\n");
     }
   }
 
   for (int i = 1; i <= ROUNDS; i++) {
     if (pthread_mutex_lock(&mutexes[client_id]) != 0) {
-      syserr("Error locking mutex %d\n");
+      error("Error locking mutex %d\n");
     }
 
     if (pthread_mutex_lock(&global_mutex) != 0) {
-      syserr("Error locking mutex %d\n");
+      error("Error locking mutex %d\n");
     }
 
     players_played_in_round++;
@@ -401,7 +374,7 @@ void trick_communication(int client_id, std::string position, int client_fd, con
     std::string next_position = find_who_next(position);
 
     if (players_played_in_round == 4) {
-      next_position = summarize_trick();
+      next_position = summarize_trick(current_round, i);
       who_won = next_position;
       players_played_in_round = 0;  
     }
@@ -417,8 +390,6 @@ void trick_communication(int client_id, std::string position, int client_fd, con
     pthread_barrier_wait(&clients_barrier);
     send_taken(client_fd,current_cards_list,i,who_won);
     pthread_barrier_wait(&clients_barrier);
-
-
   }
 }
 
@@ -426,7 +397,6 @@ void send_score_to_client(int client_fd) {
     char line[BUFFER_SIZE];
     memset(line, 0, BUFFER_SIZE);
 
-    // Tworzenie wiadomości SCORE
     std::string score_message = "SCORE";
     for (const auto& pair : total_points_round_map) {
       const std::string& position = pair.first;
@@ -434,15 +404,11 @@ void send_score_to_client(int client_fd) {
       score_message += position + std::to_string(score);
     }
     score_message += "\r\n";
-
-    // Przekopiowanie wiadomości do bufora
     snprintf(line, BUFFER_SIZE, "%s", score_message.c_str());
-
-    // Wysyłanie wiadomości
     size_t data_to_send = strnlen(line, BUFFER_SIZE);
     ssize_t written_length = writen(client_fd, line, data_to_send);
     if (written_length < 0) {
-        syserr("writen");
+        error("writen");
     } else if ((size_t)written_length != data_to_send) {
         fatal("incomplete writen");
     }
@@ -452,7 +418,6 @@ void send_total_to_client(int client_fd) {
     char line[BUFFER_SIZE];
     memset(line, 0, BUFFER_SIZE);
 
-    // Tworzenie wiadomości TOTAL
     std::string total_message = "TOTAL";
     for (const auto& pair : total_points_overall_map) {
         const std::string& position = pair.first;
@@ -461,10 +426,8 @@ void send_total_to_client(int client_fd) {
     }
     total_message += "\r\n";
 
-    // Przekopiowanie wiadomości do bufora
     snprintf(line, BUFFER_SIZE, "%s", total_message.c_str());
 
-    // Wysyłanie wiadomości
     size_t data_to_send = strnlen(line, BUFFER_SIZE);
     ssize_t written_length = writen(client_fd, line, data_to_send);
     if (written_length < 0) {
@@ -517,11 +480,9 @@ void *handle_connection(void *client_id_ptr) {
 
   std::string position = process_IAM_message(client_fd, ip_sender,port_sender,ip_local,port_local);
 
-  if (position == "")
-    syserr("error reading IAM");
+  if (position == "") syserr("error reading IAM");
   assign_position_to_index(position, client_id);
 
-  // after IAM
   pthread_barrier_wait(&clients_barrier);
 
   // DEAL
@@ -549,7 +510,7 @@ void *handle_connection(void *client_id_ptr) {
   return 0;
 }
 
-int prepare_shared_variables(int socket_fd) {
+int start_server(int socket_fd) {
   current_deal = 0;
   pthread_t threads[CLIENTS];
   players_played_in_round = 0;
@@ -572,7 +533,7 @@ int prepare_shared_variables(int socket_fd) {
     }
   }
 
-  // Zablokowanie wszystkich muteksów poza jednym
+  // Zablokowanie wszystkich muteksów poza tym który będzie odbierać pierwszego klienta
   for (int i = 1; i < CLIENTS; i++) {
     if (pthread_mutex_lock(&mutexes[i]) != 0) {
       error("Error locking mutex %d\n", i);

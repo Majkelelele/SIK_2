@@ -45,7 +45,7 @@ void send_deal_to_clients(struct pollfd *poll_descriptors, const Deal& deal,
 std::map<std::string, int> *position_fd_index);
 std::string find_who_next(std:: string current);
 void *handle_connection(void *client_fd_ptr);
-int prepare_shared_variables(int socket_fd);
+int start_server(int socket_fd);
 void destroy_and_finish();
 int accept_client(int client_id, struct sockaddr_in *client_address, socklen_t *client_address_len);
 std::string process_IAM_message(int client_fd, const std::string &ip_sender,
@@ -55,5 +55,7 @@ void trick_communication(int client_id, std::string position, int client_fd, con
  void send_score_to_client(int client_fd);
 int send_taken(int socket_fd, std::string card_list, int numer_lewy, std::string client_position);
 void send_total_to_client(int client_fd);
+std::string summarize_trick(int current_round, int trick_number);
+
 
 #endif

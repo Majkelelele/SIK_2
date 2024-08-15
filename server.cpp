@@ -28,27 +28,13 @@
 
 #define QUEUE_LENGTH 5
 
-
-
-
-
-/* Termination signal handling. */
-static void catch_int(int sig) {
-    finish = true;
-    printf("signal %d catched so no new connections will be accepted\n", sig);
-}
-
-
-
-
 int main(int argc, char *argv[]) {
     
 
-    int port;
+    int port = 0;
     std::string file;
     int timeout;
 
-    install_signal_handler(SIGINT, catch_int, SA_RESTART);
     parseArguments(argc, argv, &port, &file, &timeout);
 
     parseDealsFromFile(file);
@@ -56,11 +42,6 @@ int main(int argc, char *argv[]) {
         std::cerr << "Brak rozdań do wyświetlenia lub plik jest pusty.\n";
         return 1;
     }
-
-    printDeals(deals);
-
-    
-    
 
     // Create a socket.
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -77,29 +58,12 @@ int main(int argc, char *argv[]) {
     if (bind(socket_fd, (struct sockaddr *) &server_address, (socklen_t) sizeof(server_address)) < 0) {
         syserr("bind");
     }
-
     // Switch the socket to listening.
     if (listen(socket_fd, QUEUE_LENGTH) < 0) {
         syserr("listen");
     }
 
-    // Find out what port the server is actually listening on.
-    socklen_t lenght = (socklen_t) sizeof server_address;
-    if (getsockname(socket_fd, (struct sockaddr *) &server_address, &lenght) < 0) {
-        syserr("getsockname");
-    }
-    
-    
-
-  
-   
-    prepare_shared_variables(socket_fd);
-
-
-
-    
-    
-    
+    start_server(socket_fd);
     pthread_barrier_wait(&final_barrier);
 
     // Zwolnienie pamięci zaalokowanej dla typów rozdań

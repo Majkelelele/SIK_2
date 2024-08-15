@@ -15,7 +15,9 @@
 #define BUFFER_SIZE 100
 #define CLIENTS 4
 #define ROUNDS 13
-
+#define MILISECONDS_IN_SECOND 1000
+#define SEVEN 7
+#define LAST 13
 
 class Card {
 private:
@@ -65,9 +67,7 @@ uint16_t read_port(char const *string);
 int send_trick(int socket_fd, std::string card_list, int numer_lewy);
 std::string read_trick(int socket_fd, std::string position, int expected_trick_number,
  const std::string &ip_sender, uint16_t port_sender, const std::string &ip_local, uint16_t port_local);
-bool compareCards(const std::string& card1, const std::string& card2,
-const std::unordered_map<char, int>& cardValueMap);
-std::vector<std::string> parseAndSortCards(const std::string& cardString);
+std::vector<std::string> parseCards(const std::string& cardString);
 int set_nonblocking(int fd);
 Card createCardFromString(const std::string& cardStr, const std::string& gracz);
 void print_formatted_message(char *buffer, ssize_t received_bytes, const std::string &ip_sender,
@@ -77,7 +77,7 @@ void print_formatted_message(char *buffer, ssize_t received_bytes, const std::st
 
 class DealType {
 public:
-    virtual int countPoints(const std::vector<Card>& trick) const = 0;
+    virtual int countPoints(const std::vector<Card>& trick, int trick_number) const = 0;
     std::string id;
     virtual ~DealType() {} // Wirtualny destruktor
     std::string toString() const {
@@ -107,7 +107,7 @@ class NoTricks : public DealType {
 public:
     NoTricks() { id = "1"; }
 
-    int countPoints(const std::vector<Card>& /*trick*/) const override {
+    int countPoints(const std::vector<Card>& /*trick*/, int /*trick_number*/) const override {
         return 1; 
     }
 };
@@ -117,7 +117,7 @@ class NoHearts : public DealType {
 public:
     NoHearts() { id = "2"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
+    int countPoints(const std::vector<Card>& trick, int /*trick_number*/) const override {
         return std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getColor() == "H"; });
     }
 };
@@ -127,7 +127,7 @@ class NoQueens : public DealType {
 public:
     NoQueens() { id = "3"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
+    int countPoints(const std::vector<Card>& trick, int /*trick_number*/) const override {
         return std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getWartosc() == "Q"; }) * 5;
     }
 };
@@ -137,7 +137,7 @@ class NoJacksKings : public DealType {
 public:
     NoJacksKings() { id = "4"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
+    int countPoints(const std::vector<Card>& trick, int /*trick_number*/) const override {
         return std::count_if(trick.begin(), trick.end(), [](const Card& c) {
             return c.getWartosc() == "J" || c.getWartosc() == "K";
         }) * 2;
@@ -149,7 +149,7 @@ class NoKingOfHearts : public DealType {
 public:
     NoKingOfHearts() { id = "5"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
+    int countPoints(const std::vector<Card>& trick, int /*trick_number*/) const override {
         return std::count_if(trick.begin(), trick.end(), [](const Card& c) {
             return c.getWartosc() == "K" && c.getColor() == "H";
         }) * 18;
@@ -161,8 +161,8 @@ class NoSeventhAndLastTrick : public DealType {
 public:
     NoSeventhAndLastTrick() { id = "6"; }
 
-    int countPoints(const std::vector<Card>& /*trick*/) const override {
-        return 10; // Wartość punktowa za siódmą lub ostatnią lewę
+    int countPoints(const std::vector<Card>& /*trick*/, int trick_number) const override {
+        return (trick_number == SEVEN || trick_number == LAST) * 10;
     }
 };
 
@@ -171,17 +171,14 @@ class Rogue : public DealType {
 public:
     Rogue() { id = "7"; }
 
-    int countPoints(const std::vector<Card>& trick) const override {
-        int points = 0;
-        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getColor() == "H"; });
-        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) { return c.getWartosc() == "Q"; }) * 5;
-        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) {
-            return c.getWartosc() == "J" || c.getWartosc() == "K";
-        }) * 2;
-        points += std::count_if(trick.begin(), trick.end(), [](const Card& c) {
-            return c.getWartosc() == "K" && c.getColor() == "H";
-        }) * 18;
-        return points;
+    int countPoints(const std::vector<Card>& trick, int trick_number) const override {
+
+        return NoTricks().countPoints(trick,trick_number) + 
+               NoHearts().countPoints(trick, trick_number) +
+               NoQueens().countPoints(trick, trick_number) +
+               NoJacksKings().countPoints(trick, trick_number) +
+               NoKingOfHearts().countPoints(trick, trick_number) +
+               NoSeventhAndLastTrick().countPoints(trick, trick_number);
     }
 };
 
