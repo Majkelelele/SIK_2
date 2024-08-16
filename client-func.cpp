@@ -207,10 +207,15 @@ Card choose_card(std::string card_list, std::vector<Card> &remaining_cards) {
 }
 
 
-struct sockaddr_in get_server_address(char const *host, uint16_t port) {
+struct sockaddr_in get_server_address(ClientParams params) {
+  char const *host = params.host.c_str();
+  uint16_t port = params.port;
   struct addrinfo hints;
   memset(&hints, 0, sizeof(struct addrinfo));
-  hints.ai_family = AF_INET; // IPv4
+
+  if(params.ipv4) hints.ai_family = AF_INET; // IPv4
+  else if(params.ipv6) hints.ai_family = AF_INET6;
+  else hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = IPPROTO_TCP;
 

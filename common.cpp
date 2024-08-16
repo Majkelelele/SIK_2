@@ -254,12 +254,8 @@ void print_formatted_message(char *buffer, ssize_t received_bytes, const std::st
 
     // Natychmiastowe spłukanie buforów, aby upewnić się, że dane zostały wysłane
     if (fflush(stdout) != 0) {
-        perror("fflush");
-        exit(EXIT_FAILURE);
+        error("fflush");
     }
-
-    std::cout << "Printed " << (combined_message.size() - header_str.size()) << " bytes\n";
-
 }
 
 

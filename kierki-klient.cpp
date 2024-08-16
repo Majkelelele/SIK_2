@@ -24,7 +24,7 @@ static const char exit_string[] = "exit";
 
 int main(int argc, char *argv[]) {
     ClientParams params = parseArgumentsClient(argc, argv);
-    struct sockaddr_in server_address = get_server_address(params.host.c_str(), params.port);    
+    struct sockaddr_in server_address = get_server_address(params);    
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd < 0) {
         syserr("cannot create a socket");
@@ -64,9 +64,7 @@ int main(int argc, char *argv[]) {
         if(remaining_cards.size() == 0) disconnected = true;
         for(int i = 1; !disconnected && i <= ROUNDS; i++) {
             std::string card_list = read_trick(socket_fd, "CLIENT", i, ip_server, port_server, ip_local, local_port);
-            Card choosen_card = choose_card(card_list, remaining_cards);
-            std::cout << "remaining cards size = " << remaining_cards.size() << "\n";
-            
+            Card choosen_card = choose_card(card_list, remaining_cards);            
             send_trick(socket_fd,choosen_card.toString(),i, ip_server, port_server, ip_local, local_port);
             read_taken(socket_fd, ip_server, port_server, ip_local, local_port);
         }
